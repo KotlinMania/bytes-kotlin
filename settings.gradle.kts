@@ -17,3 +17,4 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "bytes-kotlin"
+
