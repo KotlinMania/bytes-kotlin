@@ -1,4 +1,4 @@
-// port-lint: source src/loom.rs
+// port-lint: source loom.rs
 package io.github.kotlinmania.bytes
 
 import kotlin.concurrent.atomics.AtomicLong

@@ -1,4 +1,4 @@
-// port-lint: source src/buf/uninit_slice.rs
+// port-lint: source buf/uninit_slice.rs
 package io.github.kotlinmania.bytes.buf
 
 /**
@@ -54,6 +54,20 @@ public class UninitSlice private constructor(
 
         internal fun uninitRef(slice: ByteArray): UninitSlice =
             UninitSlice(slice, 0, slice.size)
+
+        /**
+         * Creates an `UninitSlice` that references a sub-range of the given byte array
+         * **without copying**. Writes via [writeByte] or [copyFromSlice] mutate `bytes` directly.
+         *
+         * Used by [BufMut] implementations to expose a writable window over their internal
+         * storage. `bytes` is captured by reference; the returned slice retains a view over it
+         * while the parent [BufMut] is still in use.
+         */
+        internal fun rangeRef(bytes: ByteArray, start: Int, end: Int): UninitSlice {
+            require(start in 0..bytes.size)
+            require(end in start..bytes.size)
+            return UninitSlice(bytes, start, end)
+        }
 
         /**
          * Create an `UninitSlice` from a buffer and a length.

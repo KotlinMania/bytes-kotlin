@@ -1,4 +1,4 @@
-// port-lint: source src/lib.rs
+// port-lint: source lib.rs
 package io.github.kotlinmania.bytes
 
 /**
@@ -51,8 +51,35 @@ package io.github.kotlinmania.bytes
 
 // The upstream crate root enables allocation support, conditionally enables standard-library
 // support, declares the buffer, bytes, mutable-bytes, formatting, and loom modules, and exposes
-// the main buffer and byte container names from their owning modules. Kotlin callers should
-// import those owning ported symbols directly instead of using root package type aliases.
+// the main buffer and byte container names from their owning modules. Per the workspace
+// re-export workflow, this tracking file does not introduce central aliases for those names.
+// Kotlin callers should import the owning ported symbols directly from their files and use
+// Kotlin import aliasing when a faithful translation needs to preserve an upstream re-exported
+// identifier.
+
+// Upstream re-export lines:
+// - `pub use crate::buf::{Buf, BufMut};` exports `crate::buf::Buf` as `Buf` and
+//   `crate::buf::BufMut` as `BufMut` at the crate root.
+// - `pub use crate::bytes::Bytes;` exports `crate::bytes::Bytes` as `Bytes` at the crate root.
+// - `pub use crate::bytes_mut::BytesMut;` exports `crate::bytes_mut::BytesMut` as `BytesMut` at
+//   the crate root.
+
+// Callers migrated:
+// - none
+//
+// Projected callers (Rust). Determined deterministically by cross-referencing each repo's
+// `Cargo.toml` dependency on the `bytes` crate against `use bytes::<SYMBOL>` references in its
+// `tmp/` source tree:
+// - `Bytes` root re-export: `aws-sigv4-kotlin`, `axum-kotlin`, `codex-kotlin`, `http-kotlin`,
+//   `libwebrtc-kotlin`, `prost-kotlin`, `rama-core-kotlin`, `reqwest-kotlin`, `rmcp-kotlin`,
+//   `schemars-kotlin`, `sse-stream-kotlin`, `tokio-kotlin`, `tokio-util-kotlin`, `tonic-kotlin`,
+//   `tonic-prost-kotlin`, `ts-rs-kotlin`, `tungstenite-kotlin`.
+// - `BytesMut` root re-export: `aws-sigv4-kotlin`, `axum-kotlin`, `codex-kotlin`, `http-kotlin`,
+//   `libwebrtc-kotlin`, `prost-kotlin`, `rama-core-kotlin`, `reqwest-kotlin`, `rmcp-kotlin`,
+//   `tokio-kotlin`, `tokio-util-kotlin`, `tonic-kotlin`, `tonic-prost-kotlin`, `ts-rs-kotlin`,
+//   `tungstenite-kotlin`.
+// - `Buf` and `BufMut` root re-exports: see `buf/Mod.kt` for the cross-referenced projected
+//   caller list (the same names re-export through the `buf` submodule).
 
 // Optional Serde support belongs to the Kotlin port of the upstream serde module.
 

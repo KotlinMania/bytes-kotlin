@@ -1,4 +1,4 @@
-// port-lint: source src/fmt/mod.rs
+// port-lint: source fmt/mod.rs
 package io.github.kotlinmania.bytes.fmt
 
 // The upstream macro implements each formatting trait for both immutable and mutable byte
