@@ -102,9 +102,118 @@ terms or conditions.
 
 ```kotlin
 dependencies {
-    implementation("io.github.kotlinmania:bytes-kotlin:0.1.0")
+    implementation("io.github.kotlinmania:bytes-kotlin:0.2.0")
 }
 ```
+
+### Kotlin usage
+
+The Rust crate exposes four central names — `Bytes`, `BytesMut`, `Buf`, and `BufMut`. The
+Kotlin port keeps those names and the surrounding adapter types; the Rust *trait* `Buf` becomes
+a Kotlin **interface** with the same set of read methods, and likewise for `BufMut`. The Rust
+`&[u8]: Buf` and `&mut [u8]: BufMut` conformances become concrete classes [`ByteArrayBuf`] and
+[`ByteArrayBufMut`] that wrap a `ByteArray` with a cursor.
+
+```kotlin
+import io.github.kotlinmania.bytes.Bytes
+import io.github.kotlinmania.bytes.buf.ByteArrayBuf
+import io.github.kotlinmania.bytes.buf.ByteArrayBufMut
+
+// Immutable, cheaply-cloneable byte container — slicing, splitting, comparison.
+val mem = Bytes.from("Hello world")
+val a = mem.slice(0, 5)
+check(a.eq("Hello"))
+
+val b = mem.splitTo(6)
+check(mem.eq("world"))
+check(b.eq("Hello "))
+
+// Cursored read view over a ByteArray.
+val read = ByteArrayBuf("hello world".encodeToByteArray())
+check(read.getU8() == 'h'.code.toUByte())
+check(read.remaining() == 10)
+val rest = ByteArray(10)
+read.copyToSlice(rest)
+check(rest.decodeToString() == "ello world")
+
+// Cursored write view over a ByteArray.
+val dst = ByteArray(11)
+val write = ByteArrayBufMut(dst)
+write.putSlice("hello ".encodeToByteArray())
+write.putU8('w'.code.toUByte())
+write.putSlice("orld".encodeToByteArray())
+check(dst.decodeToString() == "hello world")
+```
+
+#### Reading typed numbers
+
+`Buf` provides the same family of `getU8`, `getU16`, `getU32`, `getU64`, `getI*`, `getF32`,
+`getF64`, `getUint(nbytes)`, `getInt(nbytes)` methods as upstream — both big-endian and
+little-endian variants (`getU16Le`, etc.) and a native-endian alias (`getU16Ne`) that delegates
+to the little-endian path on every platform supported by this port. There is no native 128-bit
+primitive in Kotlin, so `getU128` / `getI128` return [`U128`] / [`I128`] wrapper data classes
+that hold two `ULong` halves.
+
+```kotlin
+val buf = ByteArrayBuf(byteArrayOf(0x08, 0x09, 'h'.code.toByte(), 'i'.code.toByte()))
+check(buf.getU16() == 0x0809u.toUShort())   // big-endian
+```
+
+The `tryGet*` family returns `kotlin.Result<T>` and never throws on under-read:
+
+```kotlin
+val short = ByteArrayBuf(byteArrayOf())
+check(short.tryGetU8().isFailure)
+```
+
+#### Writing typed numbers
+
+`BufMut` provides the matching `putU8`, `putU16(Le|Ne)`, `putU32`, `putU64`, `putI*`, `putF32`,
+`putF64`, `putUint(value, nbytes)`, `putInt(value, nbytes)` methods, plus `putSlice(ByteArray)`
+and `putBytes(value, count)`.
+
+#### Adapters
+
+The same adapter types from upstream are available in `io.github.kotlinmania.bytes.buf`:
+
+| Type | What it does |
+|---|---|
+| `Chain`     | sequences two `Buf`s (or two `BufMut`s) into one continuous view |
+| `Take`      | limits a `Buf` to read at most N more bytes |
+| `Limit`     | limits a `BufMut` to write at most N more bytes |
+| `Reader`    | exposes a `Buf` as a stream-of-bytes reader (`read`, `fillBuf`, `consume`) |
+| `Writer`    | exposes a `BufMut` as a stream-of-bytes writer (`write`, `flush`) |
+| `IntoIter`  | iterates the bytes of a `Buf` one at a time (Kotlin `Iterator<Byte>`) |
+| `VecDequeBuf` | wraps a Kotlin `ArrayDeque<Byte>` so it can be read as a `Buf` |
+| `UninitSlice` | the writable window returned by `BufMut.chunkMut()` |
+
+```kotlin
+val chain = ByteArrayBuf("hello ".encodeToByteArray())
+    .chain(ByteArrayBuf("world".encodeToByteArray()))
+val full = chain.copyToBytes(11)
+check(full.asSlice().contentEquals("hello world".encodeToByteArray()))
+```
+
+#### Error handling
+
+Underflow / over-advance panics in upstream Rust are translated to thrown
+[`TryGetError`] exceptions in Kotlin. Use the `tryGet*` and `tryCopyToSlice`
+variants to receive them as `Result.failure` instead of throwing.
+
+#### Differences from upstream worth knowing
+
+- **No `BytesMut` yet.** The mutable byte buffer (growable storage with `freeze()` to convert
+  back to `Bytes`) is being ported in a follow-up release. For 0.2.0, mutable cursored writes
+  go through `ByteArrayBufMut` against a pre-sized `ByteArray`.
+- **No `serde` integration yet.** The upstream `serde` feature port is on the roadmap and will
+  arrive once [`serde-kotlin`](https://github.com/KotlinMania/serde-kotlin) is published.
+- **No raw-pointer zero-copy assertions.** Kotlin has no raw pointers, so behavior tests use
+  content equality where upstream uses pointer equality. Reference-counted sharing is preserved
+  internally via the `Bytes` cursor / shared-slice machinery.
+- **Native-endian methods** (`*Ne`) delegate to the little-endian variant on every platform
+  this port targets (macOS arm64, Linux x64, MinGW x64, iOS, Android, JS, Wasm-JS — all LE).
+  If you need big-endian native delegation for a future big-endian platform, override the
+  `NATIVE_IS_BIG_ENDIAN` constant in the port.
 
 ### Maintainer
 

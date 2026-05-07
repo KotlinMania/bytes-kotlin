@@ -1,4 +1,4 @@
-// port-lint: source src/fmt/debug.rs
+// port-lint: source fmt/debug.rs
 package io.github.kotlinmania.bytes.fmt
 
 /**

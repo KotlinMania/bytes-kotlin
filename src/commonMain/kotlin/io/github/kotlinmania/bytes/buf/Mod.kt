@@ -1,4 +1,4 @@
-// port-lint: source src/buf/mod.rs
+// port-lint: source buf/mod.rs
 package io.github.kotlinmania.bytes.buf
 
 /**
@@ -49,13 +49,17 @@ package io.github.kotlinmania.bytes.buf
 //   Kotlin source files corresponding to those Rust caller files, so there are no concrete
 //   callers to rewrite yet.
 //
-// Projected callers (Rust):
-// - `prost-kotlin`, `rama-core-kotlin`, `reqwest-kotlin`, `rmcp-kotlin`, `sse-stream-kotlin`,
-//   `tokio-kotlin`, `tokio-util-kotlin`, `tonic-kotlin`, `tonic-prost-kotlin`, and
-//   `tungstenite-kotlin` import the root `Buf` re-export.
-// - `aws-sigv4-kotlin`, `axum-kotlin`, `http-kotlin`, `libwebrtc-kotlin`, `prost-kotlin`,
-//   `rama-core-kotlin`, `reqwest-kotlin`, `tokio-kotlin`, `tokio-util-kotlin`, `tonic-kotlin`,
-//   and `tonic-prost-kotlin` import the root `BufMut` re-export.
-// - `tonic-kotlin` imports the `bytes::buf::UninitSlice` re-export.
-//
-// (From `/Volumes/stuff/Projects/kotlinmania/bytes-kotlin/RUST_CALLERS.md`.)
+// Projected callers (Rust). Determined deterministically by cross-referencing each repo's
+// `Cargo.toml` dependency on the `bytes` crate against `use bytes::<SYMBOL>` references in its
+// `tmp/` source tree:
+// - `Buf` re-export: `prost-kotlin`, `rama-core-kotlin`, `reqwest-kotlin`, `rmcp-kotlin`,
+//   `sse-stream-kotlin`, `tokio-kotlin`, `tokio-util-kotlin`, `tonic-kotlin`,
+//   `tonic-prost-kotlin`, `tungstenite-kotlin`.
+// - `BufMut` re-export: `aws-sigv4-kotlin`, `axum-kotlin`, `http-kotlin`, `libwebrtc-kotlin`,
+//   `prost-kotlin`, `rama-core-kotlin`, `reqwest-kotlin`, `rmcp-kotlin`, `tokio-kotlin`,
+//   `tokio-util-kotlin`, `tonic-kotlin`, `tonic-prost-kotlin`.
+// - `UninitSlice` re-export: `tokio-kotlin`, `tonic-kotlin`.
+// - `Limit` re-export: `tonic-kotlin`.
+// - `Chain`, `IntoIter`, `Reader`, `Take`, `Writer` re-exports: no direct importers found in any
+//   dep-repo's Rust source — those adapter types are reached through trait method calls rather
+//   than name imports.

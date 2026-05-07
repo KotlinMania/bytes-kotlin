@@ -1,4 +1,4 @@
-// port-lint: source src/fmt/hex.rs
+// port-lint: source fmt/hex.rs
 package io.github.kotlinmania.bytes.fmt
 
 internal fun lowerHexBytesRef(bytesRef: BytesRef): String {
