@@ -1,0 +1,18 @@
+bytes-kotlin
+
+This Kotlin Multiplatform port takes the upstream Rust crate files from:
+  https://github.com/tokio-rs/bytes
+
+Upstream files mirrored here:
+  README.md - upstream README text is reproduced with Kotlin-port wrapper
+              sections and absolute-link edits.
+  LICENSE   - copied from the upstream tokio-rs/bytes LICENSE file and kept
+              under the upstream authors' copyright notice.
+
+Original upstream authorship and license notices remain with the tokio-rs/bytes
+maintainers and contributors.
+
+Kotlin port:
+  Copyright (c) 2026 Sydney Renee and The Solace Project.
+  Byline:    Sydney Renee <sydney@solace.ofharmony.ai>, founder of The Solace Project.
+  Maintainer: Sydney Renee <sydney@solace.ofharmony.ai> (@sydneyrenee)

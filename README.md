@@ -8,6 +8,8 @@ This is a Kotlin Multiplatform line-by-line transliteration port of [`tokio-rs/b
 
 **Original Project:** This port is based on [`tokio-rs/bytes`](https://github.com/tokio-rs/bytes). All design credit and project intent belong to the upstream authors; this repository is a faithful port to Kotlin Multiplatform with no behavioural changes intended.
 
+The upstream README and license text are treated as upstream-authored source documents. This repository adds Kotlin-port wrapper sections, absolute-link edits, and port-specific notices while keeping upstream authorship attached to the original text.
+
 ### Porting status
 
 This is an **in-progress port**. The goal is feature parity with the upstream Rust crate while providing a native Kotlin Multiplatform API. Every Kotlin file carries a `// port-lint: source <path>` header naming its upstream Rust counterpart so the AST-distance tool can track provenance.
@@ -104,6 +106,10 @@ dependencies {
 }
 ```
 
+### Maintainer
+
+Sydney Renee <sydney@solace.ofharmony.ai> (GitHub: [@sydneyrenee](https://github.com/sydneyrenee)) maintains this Kotlin port. Sydney Renee is the founder of The Solace Project.
+
 ### Building
 
 ```bash
@@ -127,10 +133,11 @@ See [AGENTS.md](AGENTS.md) and [CLAUDE.md](CLAUDE.md) for translator discipline,
 
 ### License
 
-This Kotlin port is distributed under the same MIT license as the upstream [`tokio-rs/bytes`](https://github.com/tokio-rs/bytes). See [LICENSE](LICENSE) (and any sibling `LICENSE-*` / `NOTICE` files mirrored from upstream) for the full text.
+This Kotlin port is distributed under the same MIT license as the upstream [`tokio-rs/bytes`](https://github.com/tokio-rs/bytes). See [LICENSE](LICENSE) for the upstream license text and [NOTICE](NOTICE) for the Kotlin port notice.
 
 Original work copyrighted by the bytes authors.  
 Kotlin port: Copyright (c) 2026 Sydney Renee and The Solace Project.
+Byline: Sydney Renee <sydney@solace.ofharmony.ai>, founder of The Solace Project.
 
 ### Acknowledgments
 
