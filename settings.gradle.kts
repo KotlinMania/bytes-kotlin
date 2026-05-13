@@ -18,3 +18,12 @@ dependencyResolutionManagement {
 
 rootProject.name = "bytes-kotlin"
 
+val serdeLocal = file("../serde-kotlin")
+if (serdeLocal.exists()) {
+    includeBuild(serdeLocal) {
+        dependencySubstitution {
+            substitute(module("io.github.kotlinmania:serde-kotlin")).using(project(":"))
+        }
+    }
+}
+
