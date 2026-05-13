@@ -489,7 +489,7 @@ public class Bytes private constructor(
      * Mirrors the upstream slice-projection. Returns the visible byte region as a fresh
      * [ByteArray]; the upstream returns `&[u8]`.
      */
-    public fun deref(): Target = asSlice()
+    public fun deref(): ByteArray = asSlice()
 
     /**
      * Mirrors the upstream hashing entry point. Delegates to Kotlin's [hashCode], which in
@@ -531,15 +531,6 @@ private class SharedBytes(
 // vtable surface here exists alongside it so consumers and future internal
 // callers can route through a canonical Vtable instance, and so the porting tool
 // preserves the function-by-function structure of upstream's bytes.rs for the porting tools.
-
-/** Bytes-as-slice projection target. Upstream Deref Target is [u8]; in Kotlin that is ByteArray. */
-internal typealias Target = ByteArray
-
-/** Iteration item type. Upstream Item is u8; in Kotlin that is Byte. */
-internal typealias Item = Byte
-
-/** Iterator type produced by Bytes when iterated. Upstream IntoIter is the IntoIter wrapper. */
-internal typealias IntoIter = io.github.kotlinmania.bytes.buf.IntoIter<io.github.kotlinmania.bytes.buf.Buf>
 
 /**
  * Vtable of polymorphic operations for [Bytes] storage.
