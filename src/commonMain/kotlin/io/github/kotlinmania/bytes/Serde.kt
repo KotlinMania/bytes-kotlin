@@ -11,35 +11,11 @@ import io.github.kotlinmania.serde.core.ser.Error
 import io.github.kotlinmania.serde.core.ser.Serializer
 import kotlin.math.min
 
-/**
- * The upstream Rust file defines a `serde_impl!` macro that emits, for a given type, a
- * `Serialize` impl, a `Visitor` struct, and a `Deserialize` impl, parameterised by a
- * slice constructor and a vec constructor. The macro is invoked twice:
- *
- *  - `serde_impl!(Bytes,    BytesVisitor,    copyFromSlice, from)`
- *  - `serde_impl!(BytesMut, BytesMutVisitor, from,          fromVec)`
- *
- * Kotlin has no macros, so each invocation is translated as an explicit triple
- * — a `Type.serialize` extension function (matching the `Impls.kt` pattern in
- * `serde-kotlin`), a private `data object` [Visitor], and a public `data object`
- * [Deserialize] singleton. Kotlin cannot bolt a `Serialize` interface onto [Bytes] /
- * [BytesMut] from outside their declaring files, so the receiver-binding lives on the
- * extension instead.
- */
-
-/**
- * `DeserializeSeed` adapter that hands a single `u8` to a [SeqAccess]. The upstream
- * macro calls `seq.next_element()?` with the element type inferred to `u8`; in Kotlin
- * `SeqAccess.nextElement` is parameterised over a `DeserializeSeed`, so we wrap the
- * primitive [I8Deserialize] in one.
- */
 private data object ByteSeed : DeserializeSeed<Byte> {
     override fun <D> deserialize(deserializer: D): Result<Byte>
         where D : Deserializer =
         I8Deserialize.deserialize(deserializer)
 }
-
-////////////////////////////////////////////////////////////////////////////////
 
 public fun <Ok, E> Bytes.serialize(serializer: Serializer<Ok, E>): Result<Ok>
     where E : Error =
@@ -80,8 +56,6 @@ public data object BytesDeserialize : Deserialize<Bytes> {
         where D : Deserializer =
         deserializer.deserializeByteBuf(BytesVisitor)
 }
-
-////////////////////////////////////////////////////////////////////////////////
 
 public fun <Ok, E> BytesMut.serialize(serializer: Serializer<Ok, E>): Result<Ok>
     where E : Error =
