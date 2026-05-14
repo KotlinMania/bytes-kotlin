@@ -271,7 +271,7 @@ dependencies {
     codeqlSourceClasspath("org.jetbrains.kotlinx:kotlinx-serialization-json-jvm:1.11.0")
     codeqlSourceClasspath("org.jetbrains.kotlinx:kotlinx-datetime-jvm:0.8.0")
     codeqlSourceClasspath("org.jetbrains.kotlinx:kotlinx-collections-immutable-jvm:0.4.0")
-    codeqlSourceClasspath("io.github.kotlinmania:serde-kotlin-android:0.1.1")
+    // serde-kotlin: once published to Maven Central, add the -jvm or -android variant here
 }
 
 val codeqlCompileJvm = tasks.register<JavaExec>("codeqlCompileJvm") {
@@ -321,12 +321,6 @@ val codeqlCompileJvm = tasks.register<JavaExec>("codeqlCompileJvm") {
             "-opt-in", "kotlin.concurrent.atomics.ExperimentalAtomicApi",
         ) + sourceFiles.map { it.absolutePath }
     }
-}
-
-tasks.register<Exec>("setupAndroidSdk") {
-    group = "setup"
-    description = "Downloads and configures the project-local Android SDK."
-    commandLine("./setup-android-sdk.sh")
 }
 
 tasks.register("test") {
