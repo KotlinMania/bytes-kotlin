@@ -182,8 +182,9 @@ fun installProjectAndroidSdk(execOperations: ExecOperations) {
 // task graph, before any task executes, so a project-local Android SDK must
 // already be installed by the time configuration reaches the android target.
 // This configuration-time installer is idempotent and always writes
-// local.properties to this repo's own .android-sdk path. No env-var or
-// sibling-SDK fallback per workspace runbook.
+// local.properties to this repo's own .android-sdk path. The Kotlin-backed
+// installer runs on every host (macOS, Linux, Windows) — Windows goes through
+// cmd /c sdkmanager.bat instead of bash, so no shell or WSL dependency.
 val androidSdkExecOperations = serviceOf<ExecOperations>()
 installProjectAndroidSdk(androidSdkExecOperations)
 
