@@ -102,7 +102,7 @@ terms or conditions.
 
 ```kotlin
 dependencies {
-    implementation("io.github.kotlinmania:bytes-kotlin:0.2.0")
+    implementation("io.github.kotlinmania:bytes-kotlin:0.2.1")
 }
 ```
 
@@ -203,7 +203,7 @@ variants to receive them as `Result.failure` instead of throwing.
 #### Differences from upstream worth knowing
 
 - **No `BytesMut` yet.** The mutable byte buffer (growable storage with `freeze()` to convert
-  back to `Bytes`) is being ported in a follow-up release. For 0.2.0, mutable cursored writes
+  back to `Bytes`) is being ported in a follow-up release. For 0.2.1, mutable cursored writes
   go through `ByteArrayBufMut` against a pre-sized `ByteArray`.
 - **No `serde` integration yet.** The upstream `serde` feature port is on the roadmap and will
   arrive once [`serde-kotlin`](https://github.com/KotlinMania/serde-kotlin) is published.
