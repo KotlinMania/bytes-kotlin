@@ -179,13 +179,19 @@ fun installProjectAndroidSdk(execOperations: ExecOperations) {
 }
 
 // The Android Gradle plugin resolves the SDK location while Gradle builds the
-// task graph, before any task executes, so a project-local Android SDK must
-// already be installed by the time configuration reaches the android target.
-// This configuration-time installer is idempotent and always writes
-// local.properties to this repo's own .android-sdk path. No env-var or
-// sibling-SDK fallback per workspace runbook.
-val androidSdkExecOperations = serviceOf<ExecOperations>()
-installProjectAndroidSdk(androidSdkExecOperations)
+// task graph — before any task executes — so a project-local Android SDK must
+// already be installed by the time configuration runs. setup-android-sdk.sh
+// installs the SDK into this repo's own .android-sdk/ and writes
+// local.properties to point there. It runs conditionally on every
+// configuration: the script itself is idempotent (an already-installed SDK is
+// a fast no-op), but Windows builds skip this step since they don't target
+// Android and don't have bash in the expected location.
+val osName = System.getProperty("os.name").lowercase()
+val isWindows = osName.contains("windows")
+
+if (!isWindows) {
+    serviceOf<ExecOperations>().exec { commandLine("bash", "./setup-android-sdk.sh") }
+}
 
 kotlin {
     applyDefaultHierarchyTemplate()
