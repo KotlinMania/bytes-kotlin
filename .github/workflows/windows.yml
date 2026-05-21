@@ -26,7 +26,11 @@ jobs:
         uses: gradle/actions/setup-gradle@v6.1.0
 
       - name: Build and test Windows target
-        run: ./gradlew mingwX64Test --no-configuration-cache
+        run: >
+          ./gradlew
+          setupAndroidSdk
+          mingwX64Test
+          --no-configuration-cache
 
       - name: Upload test reports (Windows)
         if: success() || failure()
