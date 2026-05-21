@@ -28,11 +28,16 @@ version = "0.2.0"
 // task graph — before any task executes — so a project-local Android SDK must
 // already be installed by the time configuration runs. setup-android-sdk.sh
 // installs the SDK into this repo's own .android-sdk/ and writes
-// local.properties to point there. It runs unconditionally on every
+// local.properties to point there. It runs conditionally on every
 // configuration: the script itself is idempotent (an already-installed SDK is
-// a fast no-op), but there is deliberately no Gradle-side condition that could
-// skip the install, and no fallback to a sibling repo's SDK.
-serviceOf<ExecOperations>().exec { commandLine("bash", "./setup-android-sdk.sh") }
+// a fast no-op), but Windows builds skip this step since they don't target
+// Android and don't have bash in the expected location.
+val osName = System.getProperty("os.name").lowercase()
+val isWindows = osName.contains("windows")
+
+if (!isWindows) {
+    serviceOf<ExecOperations>().exec { commandLine("bash", "./setup-android-sdk.sh") }
+}
 
 kotlin {
     applyDefaultHierarchyTemplate()
