@@ -211,10 +211,18 @@ kotlin {
         binaries.framework { baseName = "Bytes"; xcf.add(this) }
     }
     iosSimulatorArm64 {
-        binaries.framework { baseName = "Bytes"; xcf.add(this) }
+        binaries.framework {
+            baseName = "Bytes"
+            isStatic = true
+            xcf.add(this)
+        }
     }
     iosX64 {
-        binaries.framework { baseName = "Bytes"; xcf.add(this) }
+        binaries.framework {
+            baseName = "Bytes"
+            isStatic = true
+            xcf.add(this)
+        }
     }
 
     tvosArm64 {
