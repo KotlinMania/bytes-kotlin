@@ -209,7 +209,39 @@ fun installProjectAndroidSdk(execOperations: ExecOperations) {
     println("setup-android-sdk: done; SDK at $projectAndroidSdkDir")
 }
 
+// Leaf names of the tasks the invocation actually requested, lowercased.
+val requestedTaskNames = gradle.startParameter.taskNames.map { it.substringAfterLast(':').lowercase() }
+
+// Aggregate lifecycle tasks that transitively configure/execute AGP Android tasks.
+val androidAggregateTasks = setOf("build", "check", "assemble", "test", "alltests", "hosttests")
+
+// True when the named task needs the AGP-managed Android SDK. Kotlin/Native
+// androidNative* targets compile through the NDK/konan, NOT the AGP SDK, so
+// they must not trigger an install.
+fun taskNeedsAndroidSdk(name: String): Boolean {
+    if (name.contains("androidnative")) return false
+    return name.contains("android") ||
+        name.contains("unittest") ||
+        name in androidAggregateTasks ||
+        name.startsWith("publish") ||
+        name == "setupandroidsdk" ||
+        name == "ensureandroidsdk"
+}
+
+val androidBuildRequested = requestedTaskNames.any(::taskNeedsAndroidSdk)
+
+// The Android Gradle plugin resolves the SDK location while Gradle builds the
+// task graph — before any task executes, so a dependsOn(ensureAndroidSdk) edge
+// fires too late (the failure surfaces as "Could not determine the dependencies
+// of task ':extractAndroidMainAnnotations'"). When an Android build is
+// requested the SDK must therefore already be on disk at configuration time, so
+// install it eagerly (idempotent — a warm SDK pays only an existence check).
+// Pure non-Android builds (e.g. linuxX64, js, androidNative*) skip the download
+// entirely. local.properties is always written so a present SDK is discoverable.
 writeAndroidLocalProperties()
+if (androidBuildRequested && !isProjectAndroidSdkInstalled()) {
+    installProjectAndroidSdk(serviceOf<ExecOperations>())
+}
 
 val ensureAndroidSdk by tasks.registering {
     group = "setup"
@@ -220,7 +252,10 @@ val ensureAndroidSdk by tasks.registering {
     }
 }
 
-tasks.matching { it.name == "compileAndroidMain" }.configureEach {
+// Secondary guard on the execution path: every AGP Android task also depends on
+// the installer, covering re-runs where the marker was removed after the
+// configuration-time install above.
+tasks.matching { it.name != "ensureAndroidSdk" && taskNeedsAndroidSdk(it.name.lowercase()) }.configureEach {
     dependsOn(ensureAndroidSdk)
 }
 
