@@ -1,5 +1,9 @@
 // port-lint: source buf/vec_deque.rs
+@file:OptIn(kotlin.experimental.ExperimentalObjCRefinement::class)
+
 package io.github.kotlinmania.bytes.buf
+
+import kotlin.native.HiddenFromObjC
 
 /**
  * Adapter exposing a Kotlin [ArrayDeque] of [Byte] as a [Buf].
@@ -8,7 +12,14 @@ package io.github.kotlinmania.bytes.buf
  * extension-style impls on stdlib types do not satisfy interface conformance, so the analog is
  * a small wrapper class that you construct with the deque you want to read out of. Reads pull
  * from the front of the deque, mirroring the upstream slice-views and drain semantics.
+ *
+ * Hidden from the Obj-C / Swift Export bridge: the constructor exposes a mutable generic
+ * [ArrayDeque] of [Byte], and Swift Export's bridge generator erases that to `ArrayDeque<Any?>`
+ * and then fails to cast it back to `ArrayDeque<Byte>`. The annotation keeps the Kotlin API
+ * unchanged for Kotlin callers (including sibling `*-kotlin` repos) while dropping the
+ * Swift-hostile type from the generated bridge.
  */
+@HiddenFromObjC
 public class VecDequeBuf(
     private val deque: ArrayDeque<Byte>,
 ) : Buf {
