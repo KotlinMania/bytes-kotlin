@@ -22,7 +22,6 @@ public class Writer(
         public fun new(buf: BufMut): Writer = Writer(buf)
     }
 
-
     /**
      * Gets a reference to the underlying [BufMut].
      *

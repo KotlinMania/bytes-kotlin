@@ -14,8 +14,14 @@ import kotlin.test.assertTrue
 // as big endian (testing sign-extension for `getInt` and `getIntNe`).
 internal val INPUT: ByteArray =
     byteArrayOf(
-        0xff.toByte(), 'F'.code.toByte(), 'q'.code.toByte(), 'r'.code.toByte(),
-        'j'.code.toByte(), 'r'.code.toByte(), 'D'.code.toByte(), 'q'.code.toByte(),
+        0xff.toByte(),
+        'F'.code.toByte(),
+        'q'.code.toByte(),
+        'r'.code.toByte(),
+        'j'.code.toByte(),
+        'r'.code.toByte(),
+        'D'.code.toByte(),
+        'q'.code.toByte(),
     ) + "PhvTc45vvq33f6bJrUtyHESuTeklWKgYd64xgzxJwvAkpYYnpNJyZSRn".encodeToByteArray()
 
 abstract class BufTestSuite {

@@ -29,10 +29,11 @@ private data object BytesVisitor : Visitor<Bytes> {
         val len = min(seq.sizeHint() ?: 0, 4096)
         val values = ArrayList<Byte>(len)
         while (true) {
-            val next = seq.nextElement(ByteSeed).fold(
-                onSuccess = { it },
-                onFailure = { return Result.failure(it) },
-            ) ?: break
+            val next =
+                seq.nextElement(ByteSeed).fold(
+                    onSuccess = { it },
+                    onFailure = { return Result.failure(it) },
+                ) ?: break
             values.add(next)
         }
         return Result.success(Bytes.from(values.toByteArray()))
@@ -69,10 +70,11 @@ private data object BytesMutVisitor : Visitor<BytesMut> {
         val len = min(seq.sizeHint() ?: 0, 4096)
         val values = ArrayList<Byte>(len)
         while (true) {
-            val next = seq.nextElement(ByteSeed).fold(
-                onSuccess = { it },
-                onFailure = { return Result.failure(it) },
-            ) ?: break
+            val next =
+                seq.nextElement(ByteSeed).fold(
+                    onSuccess = { it },
+                    onFailure = { return Result.failure(it) },
+                ) ?: break
             values.add(next)
         }
         return Result.success(BytesMut.from(values.toByteArray()))

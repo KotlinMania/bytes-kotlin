@@ -3,7 +3,6 @@ package io.github.kotlinmania.bytes.buf
 
 import io.github.kotlinmania.bytes.Bytes
 
-
 /**
  * A `Chain` sequences two buffers.
  *
@@ -33,12 +32,12 @@ import io.github.kotlinmania.bytes.Bytes
 public class Chain(
     private val a: Any,
     private val b: Any,
-) : Buf, BufMut {
+) : Buf,
+    BufMut {
     public companion object {
         /** Creates a new `Chain` sequencing the provided values. Mirrors upstream `Chain::new`. */
         public fun new(a: Any, b: Any): Chain = Chain(a, b)
     }
-
 
     /** Gets a reference to the first underlying value. */
     public fun firstRef(): Any = a
@@ -56,8 +55,11 @@ public class Chain(
     public fun intoInner(): Pair<Any, Any> = a to b
 
     private fun firstBuf(): Buf = a as? Buf ?: error("Chain.first is not a Buf")
+
     private fun lastBuf(): Buf = b as? Buf ?: error("Chain.last is not a Buf")
+
     private fun firstBufMut(): BufMut = a as? BufMut ?: error("Chain.first is not a BufMut")
+
     private fun lastBufMut(): BufMut = b as? BufMut ?: error("Chain.last is not a BufMut")
 
     override fun remaining(): Int {

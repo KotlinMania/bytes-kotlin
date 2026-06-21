@@ -1,7 +1,6 @@
 // port-lint: source tests/test_take.rs
 package io.github.kotlinmania.bytes.buf
 
-import io.github.kotlinmania.bytes.Bytes
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFails

@@ -101,16 +101,12 @@ public class Bytes private constructor(
          * check(b.eq("hello"))
          * ```
          */
-        public fun fromStatic(bytes: ByteArray): Bytes {
-            return Bytes(SharedBytes(bytes.copyOf(), isStatic = true, owner = false), 0, bytes.size)
-        }
+        public fun fromStatic(bytes: ByteArray): Bytes = Bytes(SharedBytes(bytes.copyOf(), isStatic = true, owner = false), 0, bytes.size)
 
         /**
          * Creates a new `Bytes` from a static string.
          */
-        public fun fromStatic(bytes: String): Bytes {
-            return fromStatic(bytes.encodeToByteArray())
-        }
+        public fun fromStatic(bytes: String): Bytes = fromStatic(bytes.encodeToByteArray())
 
         /**
          * Creates a new `Bytes` with length zero and the given pointer as the address.
@@ -128,43 +124,27 @@ public class Bytes private constructor(
          * object are dropped. Kotlin owns the copied immutable byte storage
          * directly.
          */
-        public fun fromOwner(owner: ByteArray): Bytes {
-            return Bytes(SharedBytes(owner.copyOf(), isStatic = false, owner = true), 0, owner.size)
-        }
+        public fun fromOwner(owner: ByteArray): Bytes = Bytes(SharedBytes(owner.copyOf(), isStatic = false, owner = true), 0, owner.size)
 
         /**
          * Create `Bytes` with string owner data.
          */
-        public fun fromOwner(owner: String): Bytes {
-            return fromOwner(owner.encodeToByteArray())
-        }
+        public fun fromOwner(owner: String): Bytes = fromOwner(owner.encodeToByteArray())
 
         /**
          * Creates `Bytes` instance from slice, by copying it.
          */
-        public fun copyFromSlice(data: ByteArray): Bytes {
-            return from(data)
-        }
+        public fun copyFromSlice(data: ByteArray): Bytes = from(data)
 
-        public fun from(slice: ByteArray): Bytes {
-            return Bytes(SharedBytes(slice.copyOf(), isStatic = false, owner = false), 0, slice.size)
-        }
+        public fun from(slice: ByteArray): Bytes = Bytes(SharedBytes(slice.copyOf(), isStatic = false, owner = false), 0, slice.size)
 
-        public fun from(slice: String): Bytes {
-            return from(slice.encodeToByteArray())
-        }
+        public fun from(slice: String): Bytes = from(slice.encodeToByteArray())
 
-        public fun from(slice: Iterable<Byte>): Bytes {
-            return from(slice.toList().toByteArray())
-        }
+        public fun from(slice: Iterable<Byte>): Bytes = from(slice.toList().toByteArray())
 
-        public fun fromIter(intoIter: Iterable<Byte>): Bytes {
-            return from(intoIter)
-        }
+        public fun fromIter(intoIter: Iterable<Byte>): Bytes = from(intoIter)
 
-        public fun default(): Bytes {
-            return new()
-        }
+        public fun default(): Bytes = new()
     }
 
     /**
@@ -177,9 +157,7 @@ public class Bytes private constructor(
      * check(b.len() == 5)
      * ```
      */
-    public fun len(): Int {
-        return length
-    }
+    public fun len(): Int = length
 
     /**
      * Returns true if the `Bytes` has a length of 0.
@@ -191,9 +169,7 @@ public class Bytes private constructor(
      * check(b.isEmpty())
      * ```
      */
-    public fun isEmpty(): Boolean {
-        return length == 0
-    }
+    public fun isEmpty(): Boolean = length == 0
 
     /**
      * Returns true if this is the only reference to the data and conversion to
@@ -201,9 +177,7 @@ public class Bytes private constructor(
      *
      * Always returns false if the data is backed by a static slice or an owner.
      */
-    public fun isUnique(): Boolean {
-        return !shared.isStatic && !shared.owner && shared.refCount == 1
-    }
+    public fun isUnique(): Boolean = !shared.isStatic && !shared.owner && shared.refCount == 1
 
     /**
      * Returns a slice of self for the provided range.
@@ -356,25 +330,15 @@ public class Bytes private constructor(
     /**
      * Returns the immutable visible byte slice.
      */
-    public fun asSlice(): ByteArray {
-        return shared.bytes.copyOfRange(start, start + length)
-    }
+    public fun asSlice(): ByteArray = shared.bytes.copyOfRange(start, start + length)
 
-    public fun asRef(): ByteArray {
-        return asSlice()
-    }
+    public fun asRef(): ByteArray = asSlice()
 
-    public fun asString(): String {
-        return asSlice().decodeToString()
-    }
+    public fun asString(): String = asSlice().decodeToString()
 
-    public fun remaining(): Int {
-        return len()
-    }
+    public fun remaining(): Int = len()
 
-    public fun chunk(): ByteArray {
-        return asSlice()
-    }
+    public fun chunk(): ByteArray = asSlice()
 
     public fun advance(cnt: Int) {
         require(cnt <= len()) {
@@ -383,9 +347,7 @@ public class Bytes private constructor(
         incStart(cnt)
     }
 
-    public fun copyToBytes(len: Int): Bytes {
-        return splitTo(len)
-    }
+    public fun copyToBytes(len: Int): Bytes = splitTo(len)
 
     public fun clone(): Bytes {
         shared.refCount += 1
@@ -400,61 +362,33 @@ public class Bytes private constructor(
         start += by
     }
 
-    override fun iterator(): Iterator<Byte> {
-        return asSlice().iterator()
-    }
+    override fun iterator(): Iterator<Byte> = asSlice().iterator()
 
-    public fun intoIter(): Iterator<Byte> {
-        return iterator()
-    }
+    public fun intoIter(): Iterator<Byte> = iterator()
 
-    public fun eq(other: Bytes): Boolean {
-        return asSlice().contentEquals(other.asSlice())
-    }
+    public fun eq(other: Bytes): Boolean = asSlice().contentEquals(other.asSlice())
 
-    public fun eq(other: ByteArray): Boolean {
-        return asSlice().contentEquals(other)
-    }
+    public fun eq(other: ByteArray): Boolean = asSlice().contentEquals(other)
 
-    public fun eq(other: String): Boolean {
-        return asSlice().contentEquals(other.encodeToByteArray())
-    }
+    public fun eq(other: String): Boolean = asSlice().contentEquals(other.encodeToByteArray())
 
-    override fun equals(other: Any?): Boolean {
-        return other is Bytes && eq(other)
-    }
+    override fun equals(other: Any?): Boolean = other is Bytes && eq(other)
 
-    override fun hashCode(): Int {
-        return asSlice().contentHashCode()
-    }
+    override fun hashCode(): Int = asSlice().contentHashCode()
 
-    override fun compareTo(other: Bytes): Int {
-        return compareByteArrays(asSlice(), other.asSlice())
-    }
+    override fun compareTo(other: Bytes): Int = compareByteArrays(asSlice(), other.asSlice())
 
-    public fun partialCmp(other: Bytes): Int {
-        return compareTo(other)
-    }
+    public fun partialCmp(other: Bytes): Int = compareTo(other)
 
-    public fun partialCmp(other: ByteArray): Int {
-        return compareByteArrays(asSlice(), other)
-    }
+    public fun partialCmp(other: ByteArray): Int = compareByteArrays(asSlice(), other)
 
-    public fun partialCmp(other: String): Int {
-        return compareByteArrays(asSlice(), other.encodeToByteArray())
-    }
+    public fun partialCmp(other: String): Int = compareByteArrays(asSlice(), other.encodeToByteArray())
 
-    public fun borrow(): ByteArray {
-        return asSlice()
-    }
+    public fun borrow(): ByteArray = asSlice()
 
-    public fun fmt(): String {
-        return debugBytesRef(BytesRef(asSlice()))
-    }
+    public fun fmt(): String = debugBytesRef(BytesRef(asSlice()))
 
-    override fun toString(): String {
-        return fmt()
-    }
+    override fun toString(): String = fmt()
 
     /**
      * Mirrors the upstream destructor. Kotlin reclaims storage via the GC, so this entry
@@ -477,13 +411,12 @@ public class Bytes private constructor(
      * This will also always fail if the buffer was constructed via either [fromOwner] or
      * [fromStatic].
      */
-    public fun tryIntoMut(): Result<BytesMut> {
-        return if (isUnique()) {
+    public fun tryIntoMut(): Result<BytesMut> =
+        if (isUnique()) {
             Result.success(BytesMut.from(asSlice()))
         } else {
             Result.failure(IllegalStateException("Bytes is not unique"))
         }
-    }
 
     /**
      * Mirrors the upstream slice-projection. Returns the visible byte region as a fresh
@@ -696,9 +629,7 @@ private fun promotableEvenClone(data: Any?, bytes: ByteArray, start: Int, len: I
 private fun promotableToVec(data: Any?, bytes: ByteArray, start: Int, len: Int): ByteArray =
     promotableEvenToVec(data, bytes, start, len)
 
-private fun promotableToMut(data: Any?, bytes: ByteArray, start: Int, len: Int): BytesMut {
-    return BytesMut.from(bytes.copyOfRange(start, start + len))
-}
+private fun promotableToMut(data: Any?, bytes: ByteArray, start: Int, len: Int): BytesMut = BytesMut.from(bytes.copyOfRange(start, start + len))
 
 private fun promotableEvenToVec(data: Any?, bytes: ByteArray, start: Int, len: Int): ByteArray {
     // Surface a stand-alone copy of the visible region; the underlying underlying byte array is shared and
@@ -706,9 +637,7 @@ private fun promotableEvenToVec(data: Any?, bytes: ByteArray, start: Int, len: I
     return bytes.copyOfRange(start, start + len)
 }
 
-private fun promotableEvenToMut(data: Any?, bytes: ByteArray, start: Int, len: Int): BytesMut {
-    return BytesMut.from(bytes.copyOfRange(start, start + len))
-}
+private fun promotableEvenToMut(data: Any?, bytes: ByteArray, start: Int, len: Int): BytesMut = BytesMut.from(bytes.copyOfRange(start, start + len))
 
 private fun promotableEvenDrop(data: Any?) {
     val shared = data as? Shared ?: return
@@ -721,13 +650,9 @@ private fun promotableOddClone(data: Any?, bytes: ByteArray, start: Int, len: In
     return Bytes.from(bytes.copyOfRange(start, start + len))
 }
 
-private fun promotableOddToVec(data: Any?, bytes: ByteArray, start: Int, len: Int): ByteArray {
-    return bytes.copyOfRange(start, start + len)
-}
+private fun promotableOddToVec(data: Any?, bytes: ByteArray, start: Int, len: Int): ByteArray = bytes.copyOfRange(start, start + len)
 
-private fun promotableOddToMut(data: Any?, bytes: ByteArray, start: Int, len: Int): BytesMut {
-    return BytesMut.from(bytes.copyOfRange(start, start + len))
-}
+private fun promotableOddToMut(data: Any?, bytes: ByteArray, start: Int, len: Int): BytesMut = BytesMut.from(bytes.copyOfRange(start, start + len))
 
 private fun promotableOddDrop(data: Any?) {
     val shared = data as? Shared ?: return
@@ -766,9 +691,7 @@ private fun sharedToVec(data: Any?, bytes: ByteArray, start: Int, len: Int): Byt
     return sharedToVecImpl(shared, start, len)
 }
 
-private fun sharedToMutImpl(shared: Shared, start: Int, len: Int): BytesMut {
-    return BytesMut.from(shared.buf.copyOfRange(start, start + len))
-}
+private fun sharedToMutImpl(shared: Shared, start: Int, len: Int): BytesMut = BytesMut.from(shared.buf.copyOfRange(start, start + len))
 
 private fun sharedToMut(data: Any?, bytes: ByteArray, start: Int, len: Int): BytesMut {
     val shared = data as Shared

@@ -44,7 +44,8 @@ public class BytesMut private constructor(
     private var data: ByteArray,
     private var start: Int,
     private var length: Int,
-) : Buf, BufMut {
+) : Buf,
+    BufMut {
     public companion object {
         /**
          * Creates a new `BytesMut` with the specified capacity.
@@ -74,9 +75,7 @@ public class BytesMut private constructor(
         /**
          * Creates a [BytesMut] from a byte slice, copying the bytes.
          */
-        public fun from(src: ByteArray): BytesMut {
-            return BytesMut(src.copyOf(), 0, src.size)
-        }
+        public fun from(src: ByteArray): BytesMut = BytesMut(src.copyOf(), 0, src.size)
 
         /**
          * Creates a [BytesMut] from a string, encoding it as UTF-8.
@@ -121,9 +120,10 @@ public class BytesMut private constructor(
         require(at >= length) { "split_off must split at or after current length" }
         val tail = BytesMut(data, start + at, capacity() - at)
         // Truncate self's view to [start, start + at).
-        data = data.copyOfRange(0, start + at).also {
-            // Use the same backing array to keep tail and head referring to the same storage.
-        }
+        data =
+            data.copyOfRange(0, start + at).also {
+                // Use the same backing array to keep tail and head referring to the same storage.
+            }
         return tail
     }
 
@@ -289,9 +289,7 @@ public class BytesMut private constructor(
 
     private fun asSliceMut(): ByteArray = data
 
-    private fun tryUnsplit(other: BytesMut): Result<Unit> {
-        return runCatching { unsplit(other) }
-    }
+    private fun tryUnsplit(other: BytesMut): Result<Unit> = runCatching { unsplit(other) }
 
     private fun kind(): Int {
         // Upstream encodes a Vec/Arc kind in the low bits of a pointer; the Kotlin port has a
@@ -306,9 +304,7 @@ public class BytesMut private constructor(
      * The returned slice can be used to fill the buffer with data (e.g. by reading from a file)
      * before marking the data as initialized using [setLen].
      */
-    public fun spareCapacityMut(): UninitSlice {
-        return UninitSlice.rangeRef(data, start + length, data.size)
-    }
+    public fun spareCapacityMut(): UninitSlice = UninitSlice.rangeRef(data, start + length, data.size)
 
     // ---------------- Drop / Clone / format wrappers ----------------
 
@@ -359,9 +355,7 @@ public class BytesMut private constructor(
      * Mirrors the upstream fmt::Write writeStr implementation: appends the given string to
      * this buffer as UTF-8.
      */
-    public fun writeStr(s: String): Result<Unit> {
-        return runCatching { extendFromSlice(s.encodeToByteArray()) }
-    }
+    public fun writeStr(s: String): Result<Unit> = runCatching { extendFromSlice(s.encodeToByteArray()) }
 
     public fun writeFmt(args: String): Result<Unit> = writeStr(args)
 

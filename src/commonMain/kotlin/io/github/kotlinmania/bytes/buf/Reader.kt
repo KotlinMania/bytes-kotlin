@@ -21,7 +21,6 @@ public class Reader(
         public fun new(buf: Buf): Reader = Reader(buf)
     }
 
-
     /**
      * Gets a reference to the underlying [Buf].
      *

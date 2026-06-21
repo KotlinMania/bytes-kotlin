@@ -18,7 +18,6 @@ public class Take(
         public fun new(inner: Buf, limit: Int): Take = Take(inner, limit)
     }
 
-
     /**
      * Consumes this `Take`, returning the underlying value.
      *

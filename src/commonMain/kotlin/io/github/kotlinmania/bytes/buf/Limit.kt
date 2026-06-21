@@ -14,7 +14,6 @@ public class Limit(
         public fun new(inner: BufMut, limit: Int): Limit = Limit(inner, limit)
     }
 
-
     /** Consumes this `Limit`, returning the underlying value. */
     public fun intoInner(): BufMut = inner
 
