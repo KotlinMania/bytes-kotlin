@@ -332,6 +332,11 @@ public class Bytes private constructor(
      */
     public fun asSlice(): ByteArray = shared.bytes.copyOfRange(start, start + length)
 
+    public operator fun get(index: Int): Byte {
+        require(index in 0 until length) { "index out of bounds: $index" }
+        return shared.bytes[start + index]
+    }
+
     public fun asRef(): ByteArray = asSlice()
 
     public fun asString(): String = asSlice().decodeToString()
