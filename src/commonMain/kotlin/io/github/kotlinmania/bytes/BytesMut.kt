@@ -117,13 +117,13 @@ public class BytesMut private constructor(
      */
     public fun splitOff(at: Int): BytesMut {
         require(at <= capacity()) { "split_off out of bounds: $at <= ${capacity()}" }
-        require(at >= length) { "split_off must split at or after current length" }
-        val tail = BytesMut(data, start + at, capacity() - at)
-        // Truncate self's view to [start, start + at).
-        data =
-            data.copyOfRange(0, start + at).also {
-                // Use the same backing array to keep tail and head referring to the same storage.
-            }
+        val otherStart = start + at
+        val otherLength = if (length > at) length - at else 0
+        val otherCapacity = capacity() - at
+        val tail = BytesMut(data.copyOfRange(otherStart, otherStart + otherCapacity), 0, otherLength)
+        length = minOf(length, at)
+        data = data.copyOfRange(start, start + at)
+        start = 0
         return tail
     }
 
@@ -330,6 +330,16 @@ public class BytesMut private constructor(
     public fun derefMut(): ByteArray = data
 
     public fun asRef(): ByteArray = asSlice()
+
+    public operator fun get(index: Int): Byte {
+        require(index in 0 until length) { "index out of bounds: $index" }
+        return data[start + index]
+    }
+
+    public operator fun set(index: Int, value: Byte) {
+        require(index in 0 until length) { "index out of bounds: $index" }
+        data[start + index] = value
+    }
 
     public fun asMut(): ByteArray = data
 

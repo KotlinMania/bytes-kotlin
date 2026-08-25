@@ -1,4 +1,4 @@
-import XCTest
+import Testing
 import Bytes
 
 // Smoke test for the Kotlin → Swift Export → SPM → swift test pipeline.
@@ -24,12 +24,24 @@ import Bytes
 //      build.gradle.kts produced a module name that's both syntactically
 //      valid as a Swift identifier and reachable from this Package.swift
 //      via the `BytesLibrary` product.
-//
-// Add more meaningful per-API tests below as the Swift Export surface
-// grows. For now the import + a single passing assertion is the
-// canary that the pipeline is green for this repo.
-final class BytesExportTests: XCTestCase {
-    func testSwiftModuleLoads() throws {
-        XCTAssertTrue(true, "Bytes swift module imported cleanly")
+@Suite struct BytesExportTests {
+    @Test func testSwiftModuleLoads() {
+        #expect(Bool(true), "Bytes swift module imported cleanly")
+    }
+
+    @Test func testU128FromSwift() {
+        let u128 = ExportedKotlinPackages.io.github.kotlinmania.bytes.U128(
+            high: 10,
+            low: 20
+        )
+        #expect(u128.high == 10)
+        #expect(u128.low == 20)
+
+        let zero = ExportedKotlinPackages.io.github.kotlinmania.bytes.U128.Companion.shared.ZERO
+        #expect(zero.high == 0)
+        #expect(zero.low == 0)
+
+        #expect(!u128.equals(other: zero))
     }
 }
+
