@@ -4,14 +4,14 @@ Based on AST analysis, here are the concrete next steps.
 
 ## Summary
 
-- **Files Present:** 18/19 (94.7%)
-- **Function parity:** 344/370 matched (target 428) — 93.0%
-- **Class/type parity:** 21/28 matched (target 31) — 75.0%
-- **Combined symbol parity:** 365/398 matched (target 459) — 91.7%
-- **Average inline-code cosine:** 0.42 (function body across 16 matched files)
-- **Average documentation cosine:** 0.58 (doc text across 16 matched files)
-- **Cheat-zeroed Files:** 5
-- **Critical Issues:** 12 files with <0.60 function similarity
+- **Files Present:** 19/19 (100.0%)
+- **Function parity:** 354/370 matched (target 442) — 95.7%
+- **Class/type parity:** 18/28 matched (target 32) — 64.3%
+- **Combined symbol parity:** 372/398 matched (target 474) — 93.5%
+- **Average inline-code cosine:** 0.40 (function body across 17 matched files)
+- **Average documentation cosine:** 0.54 (doc text across 17 matched files)
+- **Cheat-zeroed Files:** 6
+- **Critical Issues:** 13 files with <0.60 function similarity
 
 ## Priority 1: Fix Incomplete High-Dependency Files
 
@@ -43,13 +43,13 @@ Every matched file is listed below with function and type symbol parity.
 - **Target:** `bytes.Bytes [ZERO]`
 - **Similarity:** 0.00
 - **Dependents:** 2
-- **Priority Score:** 2008110.0
-- **Functions:** 74/74 matched (target 92)
-- **Missing functions:** _none_
-- **Types:** 7/7 matched (target 9)
-- **Missing types:** _none_
-- **Tests:** 1/1 matched
-- **Lint issues:** 16
+- **Priority Score:** 2048110.0
+- **Functions:** 73/74 matched (target 92)
+- **Missing functions:** `bytes_cloning_vec`
+- **Types:** 4/7 matched (target 5)
+- **Missing types:** `Target`, `Item`, `IntoIter`
+- **Tests:** 0/1 matched
+- **Lint issues:** 12
 
 ### 3. buf.uninit_slice
 
@@ -67,9 +67,9 @@ Every matched file is listed below with function and type symbol parity.
 - **Target:** `bytes.BytesMut [ZERO]`
 - **Similarity:** 0.00
 - **Dependents:** 1
-- **Priority Score:** 1238310.0
-- **Functions:** 59/78 matched (target 87)
-- **Missing functions:** `from_vec`, `advance_unchecked`, `promote_to_shared`, `shallow_clone`, `get_vec_pos`, `set_vec_pos`, `eq`, `increment_shared`, `release_shared`, `is_unique`, `test_original_capacity_to_repr`, `test_original_capacity_from_repr`, `vptr`, `invalid_ptr`, `rebuild_vec`, `_split_to_must_use`, `_split_off_must_use`, `_split_must_use`, `bytes_mut_cloning_frozen`
+- **Priority Score:** 1128310.0
+- **Functions:** 70/78 matched (target 89)
+- **Missing functions:** `eq`, `is_unique`, `test_original_capacity_to_repr`, `test_original_capacity_from_repr`, `_split_to_must_use`, `_split_off_must_use`, `_split_must_use`, `bytes_mut_cloning_frozen`
 - **Types:** 1/5 matched (target 1)
 - **Missing types:** `Shared`, `Target`, `Item`, `IntoIter`
 - **Tests:** 0/3 matched
@@ -218,7 +218,18 @@ Every matched file is listed below with function and type symbol parity.
 - **Types:** 0/0 matched
 - **Missing types:** _none_
 
-### 18. buf.mod
+### 18. serde
+
+- **Target:** `bytes.Serde [ZERO]`
+- **Similarity:** 0.00
+- **Dependents:** 0
+- **Priority Score:** 10.0
+- **Functions:** 0/0 matched (target 12)
+- **Missing functions:** _none_
+- **Types:** 0/0 matched (target 5)
+- **Missing types:** _none_
+
+### 19. buf.mod
 
 - **Target:** `buf.Mod [STUB]`
 - **Similarity:** 0.00
@@ -238,13 +249,3 @@ For each file to be considered "complete":
 - Documentation ported
 - port-lint header present
 
-## Next Commands
-
-```bash
-# Initialize task queue for systematic porting
-cd tools/ast_distance
-./ast_distance --init-tasks ../../tmp/bytes/src rust ../../src/commonMain/kotlin/io/github/kotlinmania/bytes kotlin tasks.json ../../AGENTS.md
-
-# Get next high-priority task
-./ast_distance --assign tasks.json <agent-id>
-```

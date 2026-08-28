@@ -1,6 +1,6 @@
 # port-lint Proposed Changes
 
-**Generated:** 2026-05-06
+**Generated:** 2026-08-28
 **Source:** tmp/bytes/src
 **Target:** src/commonMain/kotlin/io/github/kotlinmania/bytes
 
