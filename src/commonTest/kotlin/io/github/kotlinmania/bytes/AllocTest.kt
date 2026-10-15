@@ -4,7 +4,6 @@ package io.github.kotlinmania.bytes
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
-import kotlin.test.assertTrue
 
 // Upstream test_bytes_odd_alloc.rs and test_bytes_vec_alloc.rs test custom global
 // allocators (#[global_allocator] static ODD: Odd, LEDGER: Ledger) and raw pointer LSB alignment.

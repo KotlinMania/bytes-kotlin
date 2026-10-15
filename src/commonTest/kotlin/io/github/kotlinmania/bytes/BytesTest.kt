@@ -207,7 +207,7 @@ class BytesTest {
     fun freezeAfterSplitOff() {
         val s = "abcdefgh".encodeToByteArray()
         val b = BytesMut.from(s)
-        val unused = b.splitOff(7)
+        b.splitOff(7)
         assertContentEquals("abcdefg".encodeToByteArray(), b.asRef())
         val frozen = b.freeze()
         assertTrue(frozen.eq("abcdefg"))
@@ -236,4 +236,3 @@ class BytesTest {
         assertContentEquals("xyz".encodeToByteArray(), collected.toByteArray())
     }
 }
-

@@ -6,6 +6,9 @@ import io.github.kotlinmania.bytes.buf.BufMut
 import io.github.kotlinmania.bytes.buf.UninitSlice
 import io.github.kotlinmania.bytes.fmt.BytesRef
 import io.github.kotlinmania.bytes.fmt.debugBytesRef
+import io.github.kotlinmania.serde.SerdeResult
+import io.github.kotlinmania.serdecore.ser.Serialize
+import io.github.kotlinmania.serdecore.ser.Serializer
 
 /**
  * A unique reference to a contiguous slice of memory.
@@ -45,7 +48,11 @@ public class BytesMut private constructor(
     private var start: Int,
     private var length: Int,
 ) : Buf,
-    BufMut {
+    BufMut,
+    Serialize {
+    override fun <Ok> serialize(serializer: Serializer<Ok>): SerdeResult<Ok> =
+        serializer.serializeBytes(asRef())
+
     public companion object {
         /**
          * Creates a new `BytesMut` with the specified capacity.
