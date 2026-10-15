@@ -8,7 +8,6 @@ import io.github.kotlinmania.serdecore.de.Deserializer
 import io.github.kotlinmania.serdecore.de.I8Deserialize
 import io.github.kotlinmania.serdecore.de.SeqAccess
 import io.github.kotlinmania.serdecore.de.Visitor
-import io.github.kotlinmania.serdecore.ser.Serializer
 import kotlin.math.min
 
 private data object ByteSeed : DeserializeSeed<Byte> {
@@ -16,9 +15,6 @@ private data object ByteSeed : DeserializeSeed<Byte> {
         where D : Deserializer =
         I8Deserialize.deserialize(deserializer)
 }
-
-public fun <Ok> Bytes.serialize(serializer: Serializer<Ok>): SerdeResult<Ok> =
-    serializer.serializeBytes(asSlice())
 
 private data object BytesVisitor : Visitor<Bytes> {
     override fun expecting(): String = "byte array"
@@ -56,9 +52,6 @@ public data object BytesDeserialize : Deserialize<Bytes> {
         where D : Deserializer =
         deserializer.deserializeByteBuf(BytesVisitor)
 }
-
-public fun <Ok> BytesMut.serialize(serializer: Serializer<Ok>): SerdeResult<Ok> =
-    serializer.serializeBytes(asRef())
 
 private data object BytesMutVisitor : Visitor<BytesMut> {
     override fun expecting(): String = "byte array"

@@ -35,7 +35,7 @@ public class VecDequeBuf(
 
     override fun advance(cnt: Int) {
         require(cnt <= deque.size) { "advance past remaining: $cnt > ${deque.size}" }
-        for (index in 0 until cnt) {
+        repeat(cnt) {
             deque.removeFirst()
         }
     }

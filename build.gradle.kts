@@ -1,5 +1,4 @@
-import org.gradle.api.tasks.ClasspathNormalizer
-import org.gradle.api.tasks.PathSensitivity
+import groovy.json.JsonSlurper
 import org.gradle.api.tasks.testing.AbstractTestTask
 import org.gradle.api.tasks.testing.logging.TestExceptionFormat
 import org.gradle.api.tasks.testing.logging.TestLogEvent
@@ -54,15 +53,75 @@ val commonMainDependencyBundle =
         .findBundle(commonMainBundleName)
         .orElseThrow { GradleException("Missing libs bundle '$commonMainBundleName'") }
 
-// The Android Gradle plugin resolves the SDK location while Gradle builds the
-// task graph — before any task executes — so a project-local Android SDK must
-// already be installed by the time configuration runs. setup-android-sdk.sh
-// installs the SDK into this repo's own .android-sdk/ and writes
-// local.properties to point there. It runs unconditionally on every
-// configuration: the script itself is idempotent (an already-installed SDK is
-// a fast no-op), but there is deliberately no Gradle-side condition that could
-// skip the install, and no fallback to a sibling repo's SDK.
-serviceOf<ExecOperations>().exec { commandLine("bash", "./setup-android-sdk.sh") }
+fun csvProperty(name: String): Set<String> =
+    providers
+        .gradleProperty(name)
+        .map { value ->
+            value
+                .split(",")
+                .map { it.trim() }
+                .filter { it.isNotEmpty() }
+                .toSet()
+        }.getOrElse(emptySet())
+
+fun optionalTrimmedProperty(name: String): String? =
+    providers
+        .gradleProperty(name)
+        .map { it.trim() }
+        .orNull
+        ?.takeIf { it.isNotEmpty() }
+
+val enabledFeatureNames = csvProperty("project.features")
+val benchmarkEnabled = "benchmark" in enabledFeatureNames
+val benchmarkTargetNames = csvProperty("project.benchmark.targets")
+
+val commonBenchmarkBundleName = optionalTrimmedProperty("project.dependencies.commonBenchmarkBundle")
+val commonBenchmarkDependencyBundle =
+    commonBenchmarkBundleName?.let { bundleName ->
+        extensions
+            .getByType(VersionCatalogsExtension::class.java)
+            .named("libs")
+            .findBundle(bundleName)
+            .orElseThrow { GradleException("Missing libs bundle '$bundleName'") }
+    }
+val commonTestBundleName = optionalTrimmedProperty("project.dependencies.commonTestBundle")
+val commonTestDependencyBundle =
+    commonTestBundleName?.let { bundleName ->
+        extensions
+            .getByType(VersionCatalogsExtension::class.java)
+            .named("libs")
+            .findBundle(bundleName)
+            .orElseThrow { GradleException("Missing libs bundle '$bundleName'") }
+    }
+if (benchmarkEnabled && commonBenchmarkDependencyBundle == null) {
+    throw GradleException("Feature 'benchmark' requires project.dependencies.commonBenchmarkBundle")
+}
+val benchmarkWarmups = providers.gradleProperty("project.benchmark.warmups").map { it.toInt() }.getOrElse(3)
+val benchmarkIterations = providers.gradleProperty("project.benchmark.iterations").map { it.toInt() }.getOrElse(5)
+val benchmarkIterationTime = providers.gradleProperty("project.benchmark.iterationTime").map { it.toLong() }.getOrElse(1L)
+val benchmarkIterationTimeUnit = providers.gradleProperty("project.benchmark.iterationTimeUnit").getOrElse("s")
+val intellijCoroutinesVersion =
+    providers.gradleProperty("versions.intellij.coroutines").getOrElse("1.10.2-intellij-1")
+
+// KGP runs Swift Export in an isolated worker whose classpath is
+// `swiftExportClasspath`. Adding a dependency disables KGP's default
+// dependency population, so keep the default embeddable runner explicit too.
+val projectDependencyHandler = project.dependencies
+configurations.configureEach {
+    if (name == "swiftExportClasspath") {
+        dependencies.add(projectDependencyHandler.create("org.jetbrains.kotlin:swift-export-embeddable:$kotlinVersion"))
+        dependencies.add(
+            projectDependencyHandler.create(
+                "org.jetbrains.intellij.deps.kotlinx:kotlinx-coroutines-core-jvm:$intellijCoroutinesVersion",
+            ),
+        )
+    }
+    if (name.contains("androidDeviceTest", ignoreCase = true) ||
+        (name.contains("Android", ignoreCase = true) && name.endsWith("RuntimeClasspath"))
+    ) {
+        exclude(group = "org.jetbrains", module = "annotations")
+    }
+}
 
 // Opt-ins shared across Kotlin targets.
 val commonOptIns =
@@ -446,14 +505,13 @@ kotlin {
         }
     }
 
-    jvm()
-
     sourceSets {
         commonMain.dependencies {
             implementation(commonMainDependencyBundle)
         }
         commonTest.dependencies {
             implementation(kotlin("test"))
+            commonTestDependencyBundle?.let { implementation(it) }
         }
         if (benchmarkEnabled) {
             val commonBenchmark = maybeCreate("commonBenchmark")
@@ -464,12 +522,6 @@ kotlin {
                 findByName("${targetName}Benchmark")?.dependsOn(commonBenchmark)
             }
         }
-        val commonTest by getting {
-            dependencies {
-                implementation(kotlin("test"))
-            }
-        }
-
     }
 }
 
@@ -521,20 +573,19 @@ tasks.withType<AbstractTestTask>().configureEach {
 // Static analysis: Detekt + Ktlint
 // ============================================================================
 detekt {
-    buildUponDefaultConfig = true
-    allRules = false
-    autoCorrect = false
+    buildUponDefaultConfig.set(true)
+    allRules.set(false)
+    autoCorrect.set(false)
     source.setFrom(files("src"))
     config.setFrom(files("detekt.yml"))
-    parallel = true
+    parallel.set(true)
 }
 
-tasks.withType<io.gitlab.arturbosch.detekt.Detekt>().configureEach {
+tasks.withType<dev.detekt.gradle.Detekt>().configureEach {
     reports {
         html.required.set(true)
         sarif.required.set(true)
-        txt.required.set(false)
-        xml.required.set(false)
+        checkstyle.required.set(false)
     }
 }
 
@@ -556,7 +607,7 @@ ktlint {
 
 if (benchmarkEnabled) {
     tasks
-        .withType<io.gitlab.arturbosch.detekt.Detekt>()
+        .withType<dev.detekt.gradle.Detekt>()
         .matching {
             it.name.contains("BenchmarkBenchmark")
         }.configureEach {
@@ -572,15 +623,9 @@ if (benchmarkEnabled) {
 }
 
 tasks.named("check") {
-    dependsOn(tasks.withType<io.gitlab.arturbosch.detekt.Detekt>())
+    dependsOn(tasks.withType<dev.detekt.gradle.Detekt>())
     dependsOn(tasks.named("ktlintCheck"))
-    // Android host unit tests run here alongside the tests that check -> allTests
-    // already executes (jvm, macosArm64, the Apple simulators, js, wasmJs,
-    // wasmWasi). Test EXECUTION belongs to check; target BUILD coverage belongs
-    // to the explicit all-target build set below.
-    dependsOn("testAndroidHostTest")
-    // Swift Export smoke test is required; it must not self-skip.
-    dependsOn("swiftExportSmokeTest")
+    dependsOn("test")
 }
 
 // ============================================================================
@@ -655,47 +700,59 @@ rootProject.extensions.configure<NodeJsRootExtension>("kotlinNodeJs") {
     versions.kotlinWebHelpers.version = providers.gradleProperty("node.kotlinWebHelpers.version").getOrElse("3.1.0")
 }
 
-mavenPublishing {
-    publishToMavenCentral()
-    signAllPublications()
+val publishProjectName = providers.gradleProperty("project.name").getOrElse("bytes-kotlin")
 
-    coordinates(group.toString(), "bytes-kotlin", version.toString())
+// Central requires a Javadoc jar per publication; KMP produces none, so attach
+// an empty one to every Maven publication.
+val emptyJavadocJar =
+    tasks.register<Jar>("emptyJavadocJar") {
+        archiveClassifier.set("javadoc")
+    }
 
-    pom {
-        name.set("bytes-kotlin")
-        description.set("Kotlin Multiplatform port of tokio-rs/bytes - Types and traits for working with bytes")
-        inceptionYear.set("2026")
-        url.set("https://github.com/KotlinMania/bytes-kotlin")
-
-        licenses {
-            license {
-                name.set("MIT")
-                url.set("https://opensource.org/licenses/MIT")
-                distribution.set("repo")
+publishing {
+    publications.withType<MavenPublication>().configureEach {
+        artifact(emptyJavadocJar)
+        pom {
+            name.set(publishProjectName)
+            description.set(providers.gradleProperty("project.pom.description").getOrElse(""))
+            inceptionYear.set("2026")
+            url.set("https://github.com/KotlinMania/$publishProjectName")
+            licenses {
+                license {
+                    name.set(providers.gradleProperty("project.pom.licenseName").getOrElse("MIT"))
+                    url.set(
+                        providers
+                            .gradleProperty("project.pom.licenseUrl")
+                            .getOrElse("https://opensource.org/licenses/MIT"),
+                    )
+                    distribution.set("repo")
+                }
             }
-        }
-
-        developers {
-            developer {
-                id.set("sydneyrenee")
-                name.set("Sydney Renee")
-                email.set("sydney@solace.ofharmony.ai")
-                url.set("https://github.com/sydneyrenee")
+            developers {
+                developer {
+                    id.set("sydneyrenee")
+                    name.set("Sydney Renee")
+                    email.set("sydney@solace.ofharmony.ai")
+                    url.set("https://github.com/sydneyrenee")
+                }
             }
-        }
-
-        scm {
-            url.set("https://github.com/KotlinMania/bytes-kotlin")
-            connection.set("scm:git:git://github.com/KotlinMania/bytes-kotlin.git")
-            developerConnection.set("scm:git:ssh://github.com/KotlinMania/bytes-kotlin.git")
+            scm {
+                url.set("https://github.com/KotlinMania/$publishProjectName")
+                connection.set("scm:git:git://github.com/KotlinMania/$publishProjectName.git")
+                developerConnection.set("scm:git:ssh://github.com/KotlinMania/$publishProjectName.git")
+            }
         }
     }
-}
 
-tasks.register<Exec>("setupAndroidSdk") {
-    group = "setup"
-    description = "Downloads and configures the project-local Android SDK."
-    commandLine("./setup-android-sdk.sh")
+    // Stage into a local Maven layout that becomes the Portal deployment bundle.
+    // maven-publish auto-generates the md5/sha1/sha256/sha512 checksums Central
+    // requires; signing (below) adds the .asc signatures.
+    repositories {
+        maven {
+            name = "centralPortalStaging"
+            url = uri(layout.buildDirectory.dir("staging-deploy"))
+        }
+    }
 }
 
 signing {
@@ -846,6 +903,13 @@ val publishToCentralPortal by tasks.registering {
 // Exact test lifecycle task. Without this, ./gradlew test is ambiguous between
 // Android test task names. This runs commonTest through the KMP allTests
 // lifecycle and adds the Android host + Swift Export parity tests.
+tasks.register("test") {
+    group = "verification"
+    description = "Runs the commonTest-backed KMP suite, Android host tests, and Swift Export smoke test."
+    dependsOn("hostTests")
+    dependsOn("swiftExportSmokeTest")
+}
+
 tasks.register("setupAndroidSdk") {
     group = "setup"
     description = "Downloads and configures the project-local Android SDK. (Alias for ensureAndroidSdk)"
@@ -861,7 +925,6 @@ tasks.register("hostTests") {
     dependsOn(
         "jvmTest",
         "macosArm64Test",
-        "jvmTest",
         "jsNodeTest",
         "wasmJsNodeTest",
         "wasmWasiNodeTest",
@@ -872,18 +935,27 @@ tasks.register("hostTests") {
 // Patch generated SPM Package.swift to include minimum macOS platform for Swift Concurrency
 tasks.matching { it.name.contains("GenerateSPMPackage") }.configureEach {
     doLast {
-        val spmDir = layout.buildDirectory.dir("SPMPackage").orNull?.asFile
+        val spmDir =
+            layout.buildDirectory
+                .dir("SPMPackage")
+                .orNull
+                ?.asFile
         if (spmDir != null && spmDir.exists()) {
             spmDir.walkTopDown().filter { it.name == "Package.swift" }.forEach { file ->
-                val text = file.readText()
+                var text = file.readText()
+                if (text.contains("swift-tools-version: 6.0")) {
+                    text = text.replace("swift-tools-version: 6.0", "swift-tools-version: 5.9")
+                }
                 if (!text.contains("platforms:")) {
-                    file.writeText(
+                    text =
                         text.replaceFirst(
                             Regex("""(let package = Package\s*\(\s*name:\s*"[^"]*",)"""),
-                            "$1\n    platforms: [.macOS(.v14)],",
-                        ),
-                    )
+                            "$1\n    platforms: [.macOS(\"15.0\")],",
+                        )
+                } else if (text.contains(".macOS(.v15)") || text.contains(".macOS(.v14)")) {
+                    text = text.replace(".macOS(.v15)", ".macOS(\"15.0\")").replace(".macOS(.v14)", ".macOS(\"15.0\")")
                 }
+                file.writeText(text)
             }
         }
     }
@@ -930,7 +1002,7 @@ tasks.register("swiftExportSmokeTest") {
                         "CONFIGURATION" to "Debug",
                         "ARCHS" to "arm64",
                         "FRAMEWORKS_FOLDER_PATH" to "Frameworks",
-                        "MACOSX_DEPLOYMENT_TARGET" to "14.0",
+                        "MACOSX_DEPLOYMENT_TARGET" to "15.0",
                         "DEPLOYMENT_TARGET_SETTING_NAME" to "MACOSX_DEPLOYMENT_TARGET",
                     ),
                 )
@@ -1012,33 +1084,39 @@ tasks.named("build") {
 
 // The generated Wasm-WASI Node test runner cannot see the filesystem unless
 // the project directory is preopened. Patch the runner before wasmWasiNodeTest.
-val patchWasmWasiNodePreopens = tasks.register("patchWasmWasiNodePreopens") {
-    description = "Preopen the project directory for the generated Wasm-WASI Node test runner."
-    group = "verification"
-    dependsOn("compileTestDevelopmentExecutableKotlinWasmWasi")
-    outputs.upToDateWhen { false }
+val patchWasmWasiNodePreopens =
+    tasks.register("patchWasmWasiNodePreopens") {
+        description = "Preopen the project directory for the generated Wasm-WASI Node test runner."
+        group = "verification"
+        dependsOn("compileTestDevelopmentExecutableKotlinWasmWasi")
+        outputs.upToDateWhen { false }
 
-    doLast {
-        val runnerFile = layout.buildDirectory.file(
-            "compileSync/wasmWasi/test/testDevelopmentExecutable/kotlin/${rootProject.name}-test.mjs",
-        ).get().asFile
-        if (!runnerFile.exists()) {
-            // No Wasm-WASI test runner was generated (the repo has no
-            // wasmWasi test sources), so there is nothing to preopen.
-            return@doLast
+        doLast {
+            val runnerFile =
+                layout.buildDirectory
+                    .file(
+                        "compileSync/wasmWasi/test/testDevelopmentExecutable/kotlin/${rootProject.name}-test.mjs",
+                    ).get()
+                    .asFile
+            if (!runnerFile.exists()) {
+                // No Wasm-WASI test runner was generated (the repo has no
+                // wasmWasi test sources), so there is nothing to preopen.
+                return@doLast
+            }
+            val text = runnerFile.readText()
+            val withCwdImport =
+                text.replace(
+                    "import { argv, env } from 'node:process';",
+                    "import { argv, env, cwd } from 'node:process';",
+                )
+            val patched =
+                withCwdImport.replace(
+                    "const wasi = new WASI({ version: 'preview1', args: argv, env, });",
+                    "const wasi = new WASI({ version: 'preview1', args: argv, env, preopens: { '/': cwd() }, });",
+                )
+            runnerFile.writeText(patched)
         }
-        val text = runnerFile.readText()
-        val withCwdImport = text.replace(
-            "import { argv, env } from 'node:process';",
-            "import { argv, env, cwd } from 'node:process';",
-        )
-        val patched = withCwdImport.replace(
-            "const wasi = new WASI({ version: 'preview1', args: argv, env, });",
-            "const wasi = new WASI({ version: 'preview1', args: argv, env, preopens: { '/': cwd() }, });",
-        )
-        runnerFile.writeText(patched)
     }
-}
 
 tasks.named("wasmWasiNodeTest") {
     dependsOn(patchWasmWasiNodePreopens)

@@ -111,7 +111,7 @@ internal fun minU64Usize(a: ULong, b: Int): Int =
     }
 
 internal fun fmt(error: TryGetError): String =
-    error.message ?: ""
+    error.message.orEmpty()
 
 internal fun from(error: TryGetError): Exception =
     error

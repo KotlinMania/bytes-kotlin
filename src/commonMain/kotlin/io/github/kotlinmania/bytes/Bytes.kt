@@ -3,6 +3,9 @@ package io.github.kotlinmania.bytes
 
 import io.github.kotlinmania.bytes.fmt.BytesRef
 import io.github.kotlinmania.bytes.fmt.debugBytesRef
+import io.github.kotlinmania.serde.SerdeResult
+import io.github.kotlinmania.serdecore.ser.Serialize
+import io.github.kotlinmania.serdecore.ser.Serializer
 
 /**
  * A cheaply cloneable and sliceable chunk of contiguous memory.
@@ -69,7 +72,11 @@ public class Bytes private constructor(
     private var start: Int,
     private var length: Int,
 ) : Iterable<Byte>,
-    Comparable<Bytes> {
+    Comparable<Bytes>,
+    Serialize {
+    override fun <Ok> serialize(serializer: Serializer<Ok>): SerdeResult<Ok> =
+        serializer.serializeBytes(asSlice())
+
     public companion object {
         /**
          * Creates a new empty `Bytes`.
