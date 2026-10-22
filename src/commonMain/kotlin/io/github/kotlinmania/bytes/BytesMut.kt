@@ -7,6 +7,8 @@ import io.github.kotlinmania.bytes.buf.UninitSlice
 import io.github.kotlinmania.bytes.fmt.BytesRef
 import io.github.kotlinmania.bytes.fmt.debugBytesRef
 import io.github.kotlinmania.serde.SerdeResult
+import io.github.kotlinmania.serdecore.de.Deserialize
+import io.github.kotlinmania.serdecore.de.Deserializer
 import io.github.kotlinmania.serdecore.ser.Serialize
 import io.github.kotlinmania.serdecore.ser.Serializer
 
@@ -51,9 +53,12 @@ public class BytesMut private constructor(
     BufMut,
     Serialize {
     override fun <Ok> serialize(serializer: Serializer<Ok>): SerdeResult<Ok> =
-        serializer.serializeBytes(asRef())
+        serialize(this, serializer)
 
-    public companion object {
+    public companion object : Deserialize<BytesMut> {
+        override fun <D> deserialize(deserializer: D): SerdeResult<BytesMut> where D : Deserializer =
+            deserializeBytesMut(deserializer)
+
         /**
          * Creates a new `BytesMut` with the specified capacity.
          *
@@ -473,39 +478,39 @@ public class BytesMut private constructor(
  */
 
 // Type-alias parity hooks. The upstream BytesMut Deref/IntoIterator impls expose the
-// associated types Target = [u8], Item = u8, IntoIter = IntoIter<BytesMut>. Kotlin has no
+// associated types Target = ByteArray, Item = Byte, IntoIter = IntoIter<BytesMut>. Kotlin has no
 // associated types on interfaces, so these aliases live as private file-level handles that the
 // porting tool can match against.
 
 private fun fromVec(vec: ByteArray): BytesMut {
-    // Mirrors upstream from_vec: build a BytesMut wrapping the given byte array directly.
+    // Mirrors upstream fromVec: build a BytesMut wrapping the given byte array directly.
     return BytesMut.from(vec)
 }
 
 private fun advanceUnchecked(buf: BytesMut, cnt: Int) {
-    // Mirrors upstream advance_unchecked: skip the bounds check and advance.
+    // Mirrors upstream advanceUnchecked: skip the bounds check and advance.
     buf.advance(cnt)
 }
 
 private fun promoteToShared(buf: BytesMut) {
-    // Mirrors upstream promote_to_shared: in Kotlin every BytesMut is its own owner; promotion
+    // Mirrors upstream promoteToShared: in Kotlin every BytesMut is its own owner; promotion
     // collapses to a no-op since there is no pointer-tagging trick to switch over.
 }
 
 private fun shallowClone(buf: BytesMut): BytesMut {
-    // Mirrors upstream shallow_clone: returns a fresh BytesMut sharing the byte content.
+    // Mirrors upstream shallowClone: returns a fresh BytesMut sharing the byte content.
     return buf.clone()
 }
 
 private fun getVecPos(buf: BytesMut): Int {
-    // Mirrors upstream get_vec_pos: in the Kotlin port this is the cursor position. Since
+    // Mirrors upstream getVecPos: in the Kotlin port this is the cursor position. Since
     // BytesMut hides its cursor, this returns 0 to denote "the cursor sits at the start of the
     // visible region" which is always true for a freshly-handed BytesMut.
     return 0
 }
 
 private fun setVecPos(buf: BytesMut, pos: Int) {
-    // Mirrors upstream set_vec_pos: cursor positioning has no externally observable effect in
+    // Mirrors upstream setVecPos: cursor positioning has no externally observable effect in
     // the Kotlin port because the cursor is fully encapsulated inside BytesMut.
 }
 
@@ -515,18 +520,18 @@ private fun eqExternal(left: BytesMut, right: BytesMut): Boolean {
 }
 
 private fun incrementShared(shared: Shared) {
-    // Mirrors upstream increment_shared: bumps the Arc-style refcount.
+    // Mirrors upstream incrementShared: bumps the refcount.
     shared.refCnt += 1
 }
 
 private fun releaseShared(shared: Shared) {
-    // Mirrors upstream release_shared: decrements the refcount. The GC reclaims the buffer
+    // Mirrors upstream releaseShared: decrements the refcount. The GC reclaims the buffer
     // when the last reference falls.
     shared.refCnt -= 1
 }
 
 private fun isUniqueShared(shared: Shared): Boolean {
-    // Mirrors upstream is_unique: true iff the shared buffer has refcount 1.
+    // Mirrors upstream isUnique: true iff the shared buffer has refcount 1.
     return shared.refCnt == 1
 }
 
@@ -537,18 +542,18 @@ private fun vptr(): Int {
 }
 
 private fun invalidPtr(): Int {
-    // Mirrors upstream invalid_ptr: a sentinel address marker. Kotlin has no raw addresses; we
+    // Mirrors upstream invalidPtr: a sentinel address marker. Kotlin has no raw addresses; we
     // use 0 as the conventional sentinel.
     return 0
 }
 
 private fun rebuildVec(buf: ByteArray, len: Int, cap: Int): ByteArray {
-    // Mirrors upstream rebuild_vec: reconstructs a Vec from a (buf, len, cap) triple. In the
+    // Mirrors upstream rebuildVec: reconstructs a byte array from a (buf, len, cap) triple. In the
     // Kotlin port we simply return the underlying ByteArray view of length len.
     return buf.copyOfRange(0, len)
 }
 
-// === Shared vtable helpers (Vec-promoted-to-Arc kind) ===
+// === Shared vtable helpers ===
 
 private fun sharedVClone(shared: Shared): Shared {
     incrementShared(shared)
@@ -568,16 +573,16 @@ private fun sharedVDrop(shared: Shared) {
 // === Must-use markers ===
 
 private fun splitToMustUseBytesMut() {
-    // Mirrors upstream _split_to_must_use lint marker. Kotlin has no equivalent of the must_use
+    // Mirrors upstream splitToMustUse lint marker. Kotlin has no equivalent of the mustUse
     // attribute; the symbol is preserved for upstream-source-locator parity.
 }
 
 private fun splitOffMustUseBytesMut() {
-    // Mirrors upstream _split_off_must_use lint marker.
+    // Mirrors upstream splitOffMustUse lint marker.
 }
 
 private fun splitMustUseBytesMut() {
-    // Mirrors upstream _split_must_use lint marker.
+    // Mirrors upstream splitMustUse lint marker.
 }
 
 // === Test-suite parity helpers (called by upstream's inline test module) ===

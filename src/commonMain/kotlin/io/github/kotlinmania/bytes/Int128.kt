@@ -1,4 +1,3 @@
-// port-lint: ignore
 // Kotlin has no native 128-bit integer type. This file provides U128 and I128 wrapper classes
 // holding two ULong halves (high and low). They satisfy the Rust upstream's get_u128 / get_i128
 // surface area on the `Buf` trait without pulling in a BigInteger dependency. Endianness is

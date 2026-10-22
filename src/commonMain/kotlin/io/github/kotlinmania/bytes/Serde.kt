@@ -2,19 +2,22 @@
 package io.github.kotlinmania.bytes
 
 import io.github.kotlinmania.serde.SerdeResult
-import io.github.kotlinmania.serdecore.de.Deserialize
-import io.github.kotlinmania.serdecore.de.DeserializeSeed
 import io.github.kotlinmania.serdecore.de.Deserializer
 import io.github.kotlinmania.serdecore.de.I8Deserialize
 import io.github.kotlinmania.serdecore.de.SeqAccess
 import io.github.kotlinmania.serdecore.de.Visitor
+import io.github.kotlinmania.serdecore.ser.Serializer
 import kotlin.math.min
 
-private data object ByteSeed : DeserializeSeed<Byte> {
-    override fun <D> deserialize(deserializer: D): SerdeResult<Byte>
-        where D : Deserializer =
-        I8Deserialize.deserialize(deserializer)
-}
+public fun <Ok> serialize(
+    self: Bytes,
+    serializer: Serializer<Ok>,
+): SerdeResult<Ok> = serializer.serializeBytes(self.asSlice())
+
+public fun <Ok> serialize(
+    self: BytesMut,
+    serializer: Serializer<Ok>,
+): SerdeResult<Ok> = serializer.serializeBytes(self.asRef())
 
 private data object BytesVisitor : Visitor<Bytes> {
     override fun expecting(): String = "byte array"
@@ -25,7 +28,7 @@ private data object BytesVisitor : Visitor<Bytes> {
         val values = ArrayList<Byte>(len)
         while (true) {
             val next =
-                access.nextElement(ByteSeed).fold(
+                access.nextElement(I8Deserialize).fold(
                     onSuccess = { it },
                     onFailure = { return SerdeResult.failure(it) },
                 ) ?: break
@@ -47,11 +50,14 @@ private data object BytesVisitor : Visitor<Bytes> {
         SerdeResult.success(Bytes.from(v.encodeToByteArray()))
 }
 
-public data object BytesDeserialize : Deserialize<Bytes> {
-    override fun <D> deserialize(deserializer: D): SerdeResult<Bytes>
-        where D : Deserializer =
-        deserializer.deserializeByteBuf(BytesVisitor)
-}
+public fun <D> deserializeBytes(deserializer: D): SerdeResult<Bytes> where D : Deserializer =
+    deserializer.deserializeByteBuf(BytesVisitor)
+
+public fun <D> deserialize(
+    deserializer: D,
+    @Suppress("UNUSED_PARAMETER") companion: Bytes.Companion,
+): SerdeResult<Bytes> where D : Deserializer =
+    deserializer.deserializeByteBuf(BytesVisitor)
 
 private data object BytesMutVisitor : Visitor<BytesMut> {
     override fun expecting(): String = "byte array"
@@ -62,7 +68,7 @@ private data object BytesMutVisitor : Visitor<BytesMut> {
         val values = ArrayList<Byte>(len)
         while (true) {
             val next =
-                access.nextElement(ByteSeed).fold(
+                access.nextElement(I8Deserialize).fold(
                     onSuccess = { it },
                     onFailure = { return SerdeResult.failure(it) },
                 ) ?: break
@@ -84,8 +90,11 @@ private data object BytesMutVisitor : Visitor<BytesMut> {
         SerdeResult.success(BytesMut.from(v.encodeToByteArray()))
 }
 
-public data object BytesMutDeserialize : Deserialize<BytesMut> {
-    override fun <D> deserialize(deserializer: D): SerdeResult<BytesMut>
-        where D : Deserializer =
-        deserializer.deserializeByteBuf(BytesMutVisitor)
-}
+public fun <D> deserializeBytesMut(deserializer: D): SerdeResult<BytesMut> where D : Deserializer =
+    deserializer.deserializeByteBuf(BytesMutVisitor)
+
+public fun <D> deserialize(
+    deserializer: D,
+    @Suppress("UNUSED_PARAMETER") companion: BytesMut.Companion,
+): SerdeResult<BytesMut> where D : Deserializer =
+    deserializer.deserializeByteBuf(BytesMutVisitor)
