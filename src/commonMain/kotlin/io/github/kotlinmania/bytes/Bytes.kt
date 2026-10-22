@@ -4,6 +4,8 @@ package io.github.kotlinmania.bytes
 import io.github.kotlinmania.bytes.fmt.BytesRef
 import io.github.kotlinmania.bytes.fmt.debugBytesRef
 import io.github.kotlinmania.serde.SerdeResult
+import io.github.kotlinmania.serdecore.de.Deserialize
+import io.github.kotlinmania.serdecore.de.Deserializer
 import io.github.kotlinmania.serdecore.ser.Serialize
 import io.github.kotlinmania.serdecore.ser.Serializer
 
@@ -75,9 +77,12 @@ public class Bytes private constructor(
     Comparable<Bytes>,
     Serialize {
     override fun <Ok> serialize(serializer: Serializer<Ok>): SerdeResult<Ok> =
-        serializer.serializeBytes(asSlice())
+        serialize(this, serializer)
 
-    public companion object {
+    public companion object : Deserialize<Bytes> {
+        override fun <D> deserialize(deserializer: D): SerdeResult<Bytes> where D : Deserializer =
+            deserializeBytes(deserializer)
+
         /**
          * Creates a new empty `Bytes`.
          *
@@ -432,7 +437,7 @@ public class Bytes private constructor(
 
     /**
      * Mirrors the upstream slice-projection. Returns the visible byte region as a fresh
-     * [ByteArray]; the upstream returns `&[u8]`.
+     * [ByteArray].
      */
     public fun deref(): ByteArray = asSlice()
 
@@ -495,7 +500,7 @@ internal class Vtable(
 
 /**
  * Owner-backed storage. The caller hands ownership of `owner` to a [Bytes]; when the last
- * clone is dropped the owner is released. Mirrors the upstream `Owned<T>` Box storage.
+ * clone is dropped the owner is released. Mirrors the upstream `Owned<T>` storage.
  */
 internal class Owned<T : Any>(
     val owner: T,
@@ -517,7 +522,7 @@ internal class Owned<T : Any>(
 /**
  * Arc-backed shared storage. The buffer is reference-counted; clones increment the count and
  * drops decrement it, freeing only when the count reaches zero. Mirrors the upstream `Shared`
- * Arc-Box storage.
+ * heap storage.
  */
 internal class Shared(
     val buf: ByteArray,
@@ -599,7 +604,7 @@ private fun ownedClone(data: Any?, bytes: ByteArray, start: Int, len: Int): Byte
 }
 
 private fun ownedToVec(data: Any?, bytes: ByteArray, start: Int, len: Int): ByteArray {
-    // Per the upstream comment, converting an owner-backed Bytes to a Vec is always a copy.
+    // Per the upstream comment, converting an owner-backed Bytes to a byte array is always a copy.
     return bytes.copyOfRange(start, start + len)
 }
 
