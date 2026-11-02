@@ -54,10 +54,7 @@ private fun tryReadFixedSize(buf: Buf, size: Int): Result<ByteArray> {
         buf.advance(size)
         return Result.success(out)
     }
-    val copy = buf.tryCopyToSlice(out)
-    if (copy.isFailure) {
-        return Result.failure(copy.exceptionOrNull() ?: TryGetError(size, buf.remaining()))
-    }
+    buf.copyToSlice(out)
     return Result.success(out)
 }
 
@@ -125,32 +122,28 @@ private fun tryReadUintBe(buf: Buf, nbytes: Int): Result<ULong> {
     if (nbytes > 8) {
         panicDoesNotFit(8, nbytes)
     }
-    val raw = tryReadFixedSize(buf, nbytes)
-    if (raw.isFailure) {
-        return Result.failure(raw.exceptionOrNull() ?: TryGetError(nbytes, buf.remaining()))
+    val src = ByteArray(nbytes)
+    return buf.tryCopyToSlice(src).map {
+        var value = 0uL
+        for (index in 0 until nbytes) {
+            value = (value shl 8) or (src[index].toULong() and 0xffuL)
+        }
+        value
     }
-    val src = raw.getOrThrow()
-    var value = 0uL
-    for (index in 0 until nbytes) {
-        value = (value shl 8) or (src[index].toULong() and 0xffuL)
-    }
-    return Result.success(value)
 }
 
 private fun tryReadUintLe(buf: Buf, nbytes: Int): Result<ULong> {
     if (nbytes > 8) {
         panicDoesNotFit(8, nbytes)
     }
-    val raw = tryReadFixedSize(buf, nbytes)
-    if (raw.isFailure) {
-        return Result.failure(raw.exceptionOrNull() ?: TryGetError(nbytes, buf.remaining()))
+    val src = ByteArray(nbytes)
+    return buf.tryCopyToSlice(src).map {
+        var value = 0uL
+        for (index in nbytes - 1 downTo 0) {
+            value = (value shl 8) or (src[index].toULong() and 0xffuL)
+        }
+        value
     }
-    val src = raw.getOrThrow()
-    var value = 0uL
-    for (index in nbytes - 1 downTo 0) {
-        value = (value shl 8) or (src[index].toULong() and 0xffuL)
-    }
-    return Result.success(value)
 }
 
 /**
