@@ -51,7 +51,7 @@ public class Writer(
         val n = minOf(buf.remainingMut(), src.size)
         if (n == src.size) {
             buf.putSlice(src)
-        } else if (n > 0) {
+        } else {
             buf.putSlice(src.copyOfRange(0, n))
         }
         return n

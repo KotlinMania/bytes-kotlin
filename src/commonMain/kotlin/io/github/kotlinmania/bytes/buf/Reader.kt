@@ -63,9 +63,6 @@ public class Reader(
      */
     public fun read(dst: ByteArray): Int {
         val len = minOf(buf.remaining(), dst.size)
-        if (len == 0) {
-            return 0
-        }
         val slice = if (len == dst.size) dst else ByteArray(len)
         buf.copyToSlice(slice)
         if (slice !== dst) {
