@@ -93,30 +93,22 @@ private fun bytesToLongLe(b: ByteArray): Long {
 }
 
 // Variable-byte-width readers used by `getUint` / `tryGetUint` / and friends. These read
-// `nbytes` (1..8) raw bytes from `buf` and assemble a u64 in the requested byte order.
-private fun readUintBe(buf: Buf, nbytes: Int): ULong {
-    if (nbytes > 8) {
-        panicDoesNotFit(8, nbytes)
+// `nbytes` (0..8) raw bytes from `buf` and assemble a u64 in the requested byte order.
+private fun readUintBe(buf: Buf, nbytes: Int): ULong =
+    tryReadUintBe(buf, nbytes).getOrElse { error ->
+        if (error is TryGetError) {
+            panicAdvance(error)
+        }
+        throw error
     }
-    val raw = readFixedSize(buf, nbytes)
-    var value = 0uL
-    for (index in 0 until nbytes) {
-        value = (value shl 8) or (raw[index].toULong() and 0xffuL)
-    }
-    return value
-}
 
-private fun readUintLe(buf: Buf, nbytes: Int): ULong {
-    if (nbytes > 8) {
-        panicDoesNotFit(8, nbytes)
+private fun readUintLe(buf: Buf, nbytes: Int): ULong =
+    tryReadUintLe(buf, nbytes).getOrElse { error ->
+        if (error is TryGetError) {
+            panicAdvance(error)
+        }
+        throw error
     }
-    val raw = readFixedSize(buf, nbytes)
-    var value = 0uL
-    for (index in nbytes - 1 downTo 0) {
-        value = (value shl 8) or (raw[index].toULong() and 0xffuL)
-    }
-    return value
-}
 
 private fun tryReadUintBe(buf: Buf, nbytes: Int): Result<ULong> {
     if (nbytes > 8) {
@@ -923,14 +915,14 @@ public interface Buf {
      *
      * Panics if `nbytes` is greater than 8.
      */
-    public fun tryGetInt(nbytes: Int): Result<Long> = tryGetUint(nbytes).map { signExtend(it, nbytes) }
+    public fun tryGetInt(nbytes: Int): Result<Long> = tryReadUintBe(this, nbytes).map { it.toLong() }
 
     /**
      * Gets a signed n-byte integer from `self` in little-endian byte order.
      *
      * Panics if `nbytes` is greater than 8.
      */
-    public fun tryGetIntLe(nbytes: Int): Result<Long> = tryGetUintLe(nbytes).map { signExtend(it, nbytes) }
+    public fun tryGetIntLe(nbytes: Int): Result<Long> = tryReadUintLe(this, nbytes).map { it.toLong() }
 
     /**
      * Gets a signed n-byte integer from `self` in native-endian byte order.
