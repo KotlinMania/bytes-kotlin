@@ -427,8 +427,8 @@ public class BytesMut private constructor(
     override fun remainingMut(): Int = (Int.MAX_VALUE - length).coerceAtLeast(0)
 
     override fun chunkMut(): UninitSlice {
-        // Ensure at least 64 bytes of writable space, growing if needed.
-        if (capacity() - length < 64) {
+        // Reserve 64 bytes when capacity is exhausted, otherwise expose existing spare capacity.
+        if (capacity() == len()) {
             reserve(64)
         }
         return UninitSlice.rangeRef(data, start + length, data.size)

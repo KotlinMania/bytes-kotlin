@@ -1,6 +1,7 @@
 // port-lint: source bytes.rs
 package io.github.kotlinmania.bytes
 
+import io.github.kotlinmania.bytes.buf.Buf
 import io.github.kotlinmania.bytes.fmt.BytesRef
 import io.github.kotlinmania.bytes.fmt.debugBytesRef
 import io.github.kotlinmania.serde.SerdeResult
@@ -75,6 +76,7 @@ public class Bytes private constructor(
     private var length: Int,
 ) : Iterable<Byte>,
     Comparable<Bytes>,
+    Buf,
     Serialize {
     override fun <Ok> serialize(serializer: Serializer<Ok>): SerdeResult<Ok> =
         serialize(this, serializer)
@@ -353,18 +355,18 @@ public class Bytes private constructor(
 
     public fun asString(): String = asSlice().decodeToString()
 
-    public fun remaining(): Int = len()
+    override fun remaining(): Int = len()
 
-    public fun chunk(): ByteArray = asSlice()
+    override fun chunk(): ByteArray = asSlice()
 
-    public fun advance(cnt: Int) {
+    override fun advance(cnt: Int) {
         require(cnt <= len()) {
             "cannot advance past `remaining`: $cnt <= ${len()}"
         }
         incStart(cnt)
     }
 
-    public fun copyToBytes(len: Int): Bytes = splitTo(len)
+    override fun copyToBytes(len: Int): Bytes = splitTo(len)
 
     public fun clone(): Bytes {
         shared.refCount += 1

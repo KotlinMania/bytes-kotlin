@@ -9,9 +9,10 @@ import io.github.kotlinmania.bytes.panicDoesNotFit
 
 // === Endianness model ===
 // Identical to Buf.kt: every supported KMP target is little-endian, so the `*Ne` (native-endian)
-// methods on BufMut delegate to the little-endian variant. The constant is duplicated rather
-// than shared to keep each file self-contained per the workspace's one-Rust-file → one-Kotlin-file
-// rule.
+// methods on BufMut use little-endian byte order (encoding native bytes directly into `putSlice`
+// for fixed-width integers, delegating to `*Le` for variable-width integers, and delegating to
+// `putU32Ne`/`putU64Ne` for floats). The constant is duplicated rather than shared to keep each
+// file self-contained per the workspace's one-Rust-file → one-Kotlin-file rule.
 private const val NATIVE_IS_BIG_ENDIAN: Boolean = false
 
 // === Byte-encoding helpers (correspond to inline fixed-size writes in upstream put_* methods).
@@ -51,23 +52,6 @@ private fun longToBytesBe(n: Long, dst: ByteArray, offset: Int) {
 private fun longToBytesLe(n: Long, dst: ByteArray, offset: Int) {
     for (index in 0 until 8) {
         dst[offset + index] = ((n ushr (index * 8)) and 0xff).toByte()
-    }
-}
-
-private fun writeFixedSize(buf: BufMut, src: ByteArray) {
-    val size = src.size
-    if (buf.remainingMut() < size) {
-        panicAdvance(TryGetError(size, buf.remainingMut()))
-    }
-    var written = 0
-    while (written < size) {
-        val dst = buf.chunkMut()
-        val cnt = minOf(size - written, dst.len())
-        for (index in 0 until cnt) {
-            dst.writeByte(index, src[written + index])
-        }
-        buf.advanceMut(cnt)
-        written += cnt
     }
 }
 
@@ -274,7 +258,8 @@ public interface BufMut {
      * This function panics if there is not enough remaining capacity in `self`.
      */
     public fun putU8(n: UByte) {
-        putBytes(n.toByte(), 1)
+        val src = byteArrayOf(n.toByte())
+        putSlice(src)
     }
 
     /**
@@ -287,151 +272,164 @@ public interface BufMut {
      * This function panics if there is not enough remaining capacity in `self`.
      */
     public fun putI8(n: Byte) {
-        putBytes(n, 1)
+        val src = byteArrayOf(n)
+        putSlice(src)
     }
 
     /** Writes an unsigned 16 bit integer to `self` in big-endian byte order. */
     public fun putU16(n: UShort) {
         val buf = ByteArray(2)
         shortToBytesBe(n.toShort(), buf, 0)
-        writeFixedSize(this, buf)
+        putSlice(buf)
     }
 
     /** Writes an unsigned 16 bit integer to `self` in little-endian byte order. */
     public fun putU16Le(n: UShort) {
         val buf = ByteArray(2)
         shortToBytesLe(n.toShort(), buf, 0)
-        writeFixedSize(this, buf)
+        putSlice(buf)
     }
 
     /** Writes an unsigned 16 bit integer to `self` in native-endian byte order. */
     public fun putU16Ne(n: UShort) {
-        if (NATIVE_IS_BIG_ENDIAN) putU16(n) else putU16Le(n)
+        val buf = ByteArray(2)
+        if (NATIVE_IS_BIG_ENDIAN) shortToBytesBe(n.toShort(), buf, 0) else shortToBytesLe(n.toShort(), buf, 0)
+        putSlice(buf)
     }
 
     /** Writes a signed 16 bit integer to `self` in big-endian byte order. */
     public fun putI16(n: Short) {
         val buf = ByteArray(2)
         shortToBytesBe(n, buf, 0)
-        writeFixedSize(this, buf)
+        putSlice(buf)
     }
 
     /** Writes a signed 16 bit integer to `self` in little-endian byte order. */
     public fun putI16Le(n: Short) {
         val buf = ByteArray(2)
         shortToBytesLe(n, buf, 0)
-        writeFixedSize(this, buf)
+        putSlice(buf)
     }
 
     /** Writes a signed 16 bit integer to `self` in native-endian byte order. */
     public fun putI16Ne(n: Short) {
-        if (NATIVE_IS_BIG_ENDIAN) putI16(n) else putI16Le(n)
+        val buf = ByteArray(2)
+        if (NATIVE_IS_BIG_ENDIAN) shortToBytesBe(n, buf, 0) else shortToBytesLe(n, buf, 0)
+        putSlice(buf)
     }
 
     /** Writes an unsigned 32 bit integer to `self` in big-endian byte order. */
     public fun putU32(n: UInt) {
         val buf = ByteArray(4)
         intToBytesBe(n.toInt(), buf, 0)
-        writeFixedSize(this, buf)
+        putSlice(buf)
     }
 
     /** Writes an unsigned 32 bit integer to `self` in little-endian byte order. */
     public fun putU32Le(n: UInt) {
         val buf = ByteArray(4)
         intToBytesLe(n.toInt(), buf, 0)
-        writeFixedSize(this, buf)
+        putSlice(buf)
     }
 
     /** Writes an unsigned 32 bit integer to `self` in native-endian byte order. */
     public fun putU32Ne(n: UInt) {
-        if (NATIVE_IS_BIG_ENDIAN) putU32(n) else putU32Le(n)
+        val buf = ByteArray(4)
+        if (NATIVE_IS_BIG_ENDIAN) intToBytesBe(n.toInt(), buf, 0) else intToBytesLe(n.toInt(), buf, 0)
+        putSlice(buf)
     }
 
     /** Writes a signed 32 bit integer to `self` in big-endian byte order. */
     public fun putI32(n: Int) {
         val buf = ByteArray(4)
         intToBytesBe(n, buf, 0)
-        writeFixedSize(this, buf)
+        putSlice(buf)
     }
 
     /** Writes a signed 32 bit integer to `self` in little-endian byte order. */
     public fun putI32Le(n: Int) {
         val buf = ByteArray(4)
         intToBytesLe(n, buf, 0)
-        writeFixedSize(this, buf)
+        putSlice(buf)
     }
 
     /** Writes a signed 32 bit integer to `self` in native-endian byte order. */
     public fun putI32Ne(n: Int) {
-        if (NATIVE_IS_BIG_ENDIAN) putI32(n) else putI32Le(n)
+        val buf = ByteArray(4)
+        if (NATIVE_IS_BIG_ENDIAN) intToBytesBe(n, buf, 0) else intToBytesLe(n, buf, 0)
+        putSlice(buf)
     }
 
     /** Writes an unsigned 64 bit integer to `self` in big-endian byte order. */
     public fun putU64(n: ULong) {
         val buf = ByteArray(8)
         longToBytesBe(n.toLong(), buf, 0)
-        writeFixedSize(this, buf)
+        putSlice(buf)
     }
 
     /** Writes an unsigned 64 bit integer to `self` in little-endian byte order. */
     public fun putU64Le(n: ULong) {
         val buf = ByteArray(8)
         longToBytesLe(n.toLong(), buf, 0)
-        writeFixedSize(this, buf)
+        putSlice(buf)
     }
 
     /** Writes an unsigned 64 bit integer to `self` in native-endian byte order. */
     public fun putU64Ne(n: ULong) {
-        if (NATIVE_IS_BIG_ENDIAN) putU64(n) else putU64Le(n)
+        val buf = ByteArray(8)
+        if (NATIVE_IS_BIG_ENDIAN) longToBytesBe(n.toLong(), buf, 0) else longToBytesLe(n.toLong(), buf, 0)
+        putSlice(buf)
     }
 
     /** Writes a signed 64 bit integer to `self` in big-endian byte order. */
     public fun putI64(n: Long) {
         val buf = ByteArray(8)
         longToBytesBe(n, buf, 0)
-        writeFixedSize(this, buf)
+        putSlice(buf)
     }
 
     /** Writes a signed 64 bit integer to `self` in little-endian byte order. */
     public fun putI64Le(n: Long) {
         val buf = ByteArray(8)
         longToBytesLe(n, buf, 0)
-        writeFixedSize(this, buf)
+        putSlice(buf)
     }
 
     /** Writes a signed 64 bit integer to `self` in native-endian byte order. */
     public fun putI64Ne(n: Long) {
-        if (NATIVE_IS_BIG_ENDIAN) putI64(n) else putI64Le(n)
+        val buf = ByteArray(8)
+        if (NATIVE_IS_BIG_ENDIAN) longToBytesBe(n, buf, 0) else longToBytesLe(n, buf, 0)
+        putSlice(buf)
     }
 
     /** Writes an unsigned 128 bit integer to `self` in big-endian byte order. */
     public fun putU128(n: U128) {
-        writeFixedSize(this, n.toBigEndianBytes())
+        putSlice(n.toBigEndianBytes())
     }
 
     /** Writes an unsigned 128 bit integer to `self` in little-endian byte order. */
     public fun putU128Le(n: U128) {
-        writeFixedSize(this, n.toLittleEndianBytes())
+        putSlice(n.toLittleEndianBytes())
     }
 
     /** Writes an unsigned 128 bit integer to `self` in native-endian byte order. */
     public fun putU128Ne(n: U128) {
-        if (NATIVE_IS_BIG_ENDIAN) putU128(n) else putU128Le(n)
+        putSlice(if (NATIVE_IS_BIG_ENDIAN) n.toBigEndianBytes() else n.toLittleEndianBytes())
     }
 
     /** Writes a signed 128 bit integer to `self` in big-endian byte order. */
     public fun putI128(n: I128) {
-        writeFixedSize(this, n.toBigEndianBytes())
+        putSlice(n.toBigEndianBytes())
     }
 
     /** Writes a signed 128 bit integer to `self` in little-endian byte order. */
     public fun putI128Le(n: I128) {
-        writeFixedSize(this, n.toLittleEndianBytes())
+        putSlice(n.toLittleEndianBytes())
     }
 
     /** Writes a signed 128 bit integer to `self` in native-endian byte order. */
     public fun putI128Ne(n: I128) {
-        if (NATIVE_IS_BIG_ENDIAN) putI128(n) else putI128Le(n)
+        putSlice(if (NATIVE_IS_BIG_ENDIAN) n.toBigEndianBytes() else n.toLittleEndianBytes())
     }
 
     /**
@@ -443,15 +441,12 @@ public interface BufMut {
      * `nbytes` is greater than 8.
      */
     public fun putUint(n: ULong, nbytes: Int) {
-        if (nbytes > 8) {
+        if (nbytes !in 0..8) {
             panicDoesNotFit(8, nbytes)
-        }
-        if (remainingMut() < nbytes) {
-            panicAdvance(TryGetError(nbytes, remainingMut()))
         }
         val full = ByteArray(8)
         longToBytesBe(n.toLong(), full, 0)
-        writeFixedSize(this, full.copyOfRange(8 - nbytes, 8))
+        putSlice(full.copyOfRange(8 - nbytes, 8))
     }
 
     /**
@@ -463,15 +458,12 @@ public interface BufMut {
      * `nbytes` is greater than 8.
      */
     public fun putUintLe(n: ULong, nbytes: Int) {
-        if (nbytes > 8) {
+        if (nbytes !in 0..8) {
             panicDoesNotFit(8, nbytes)
-        }
-        if (remainingMut() < nbytes) {
-            panicAdvance(TryGetError(nbytes, remainingMut()))
         }
         val full = ByteArray(8)
         longToBytesLe(n.toLong(), full, 0)
-        writeFixedSize(this, full.copyOfRange(0, nbytes))
+        putSlice(full.copyOfRange(0, nbytes))
     }
 
     /**
@@ -495,7 +487,12 @@ public interface BufMut {
      * `nbytes` is greater than 8.
      */
     public fun putInt(n: Long, nbytes: Int) {
-        putUint(n.toULong(), nbytes)
+        if (nbytes !in 0..8) {
+            panicDoesNotFit(8, nbytes)
+        }
+        val full = ByteArray(8)
+        longToBytesBe(n, full, 0)
+        putSlice(full.copyOfRange(8 - nbytes, 8))
     }
 
     /**
@@ -507,7 +504,12 @@ public interface BufMut {
      * `nbytes` is greater than 8.
      */
     public fun putIntLe(n: Long, nbytes: Int) {
-        putUintLe(n.toULong(), nbytes)
+        if (nbytes !in 0..8) {
+            panicDoesNotFit(8, nbytes)
+        }
+        val full = ByteArray(8)
+        longToBytesLe(n, full, 0)
+        putSlice(full.copyOfRange(0, nbytes))
     }
 
     /**
