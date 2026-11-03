@@ -243,7 +243,7 @@ For each file to be considered "complete":
 ```bash
 # Initialize task queue for systematic porting
 cd tools/ast_distance
-./ast_distance --init-tasks ../../tmp/bytes/src rust ../../src/commonMain/kotlin/io/github/kotlinmania/bytes kotlin tasks.json ../../AGENTS.md
+./ast_distance --init-tasks ../../tmp/bytes/src rust ../../src/common/commonMain/kotlin/io/github/kotlinmania/bytes kotlin tasks.json ../../AGENTS.md
 
 # Get next high-priority task
 ./ast_distance --assign tasks.json <agent-id>

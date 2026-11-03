@@ -6,7 +6,7 @@
     "lang": "rust"
   },
   "target": {
-    "path": "src/commonMain/kotlin/io/github/kotlinmania/bytes",
+    "path": "src/common/commonMain/kotlin/io/github/kotlinmania/bytes",
     "lang": "kotlin"
   },
   "checks": {
