@@ -16,15 +16,15 @@ For every Rust crate this repo owns (under `tmp/`), this file lists every **cros
 
 | package | module | inbound use sites | distinct caller crates | distinct caller repos | codex sites |
 |---|---|---:|---:|---:|---:|
-| `bytes` | `bytes` | 204 | 23 | 16 | 10 |
+| `bytes` | `bytes` | 350 | 31 | 22 | 10 |
 
 ## `bytes`
 
-### Inbound symbols (13 distinct, 204 total `use` sites)
+### Inbound symbols (13 distinct, 350 total `use` sites)
 
 Sorted by codex demand, then total demand. The first symbols are the priority queue for porting `bytes`.
 
-#### `bytes::Bytes` — 72 site(s) (9 codex, 63 other, 18 caller crates)
+#### `bytes::Bytes` — 203 site(s) (9 codex, 194 other, 25 caller crates)
 
 - ✅ `codex-kotlin/codex-api` `src/endpoint/realtime_call.rs:7` — `use bytes::Bytes`
 - ✅ `codex-kotlin/codex-api` `src/sse/responses.rs:594` — `use bytes::Bytes`
@@ -38,9 +38,9 @@ Sorted by codex demand, then total demand. The first symbols are the priority qu
 - `aws-sigv4-kotlin/aws-sigv4` `src/event_stream.rs:53` — `use bytes::Bytes`
 - `axum-kotlin/axum` `src/body/mod.rs:7` — `pub_use bytes::Bytes`
 - `axum-kotlin/axum` `src/extract/raw_form.rs:2` — `use bytes::Bytes`
-- _… and 60 more site(s)._
+- _… and 191 more site(s)._
 
-#### `bytes::BytesMut` — 45 site(s) (1 codex, 44 other, 12 caller crates)
+#### `bytes::BytesMut` — 48 site(s) (1 codex, 47 other, 14 caller crates)
 
 - ✅ `codex-kotlin/codex-ollama` `src/client.rs:1` — `use bytes::BytesMut`
 - `aws-sigv4-kotlin/aws-sigv4` `src/sign/v4a.rs:4` — `use bytes::BytesMut`
@@ -51,12 +51,12 @@ Sorted by codex demand, then total demand. The first symbols are the priority qu
 - `http-kotlin/http` `src/header/value.rs:1` — `use bytes::BytesMut`
 - `libwebrtc-kotlin/livekit` `src/room/data_stream/incoming.rs:19` — `use bytes::BytesMut`
 - `libwebrtc-kotlin/save_to_disk` `src/main.rs:1` — `use bytes::BytesMut`
+- `ogg-kotlin/ogg` `src/reading.rs:1065` — `use bytes::BytesMut`
 - `reqwest-kotlin/reqwest` `src/blocking/body.rs:275` — `use bytes::BytesMut`
 - `tokio-kotlin/tokio` `src/io/util/mem.rs:5` — `use bytes::BytesMut`
-- `tokio-kotlin/tokio` `tests/io_copy.rs:3` — `use bytes::BytesMut`
-- _… and 33 more site(s)._
+- _… and 36 more site(s)._
 
-#### `bytes::BufMut` — 43 site(s) (0 codex, 43 other, 11 caller crates)
+#### `bytes::BufMut` — 45 site(s) (0 codex, 45 other, 13 caller crates)
 
 - `aws-sigv4-kotlin/aws-sigv4` `src/sign/v4a.rs:4` — `use bytes::BufMut`
 - `axum-kotlin/axum` `src/json.rs:5` — `use bytes::BufMut`
@@ -64,16 +64,20 @@ Sorted by codex demand, then total demand. The first symbols are the priority qu
 - `http-kotlin/http` `src/header/name.rs:1127` — `use bytes::BufMut`
 - `http-kotlin/http` `src/header/name.rs:1544` — `use bytes::BufMut`
 - `libwebrtc-kotlin/save_to_disk` `src/main.rs:1` — `use bytes::BufMut`
+- `parquet-kotlin/parquet` `src/encodings/encoding/byte_stream_split_encoder.rs:24` — `use bytes::BufMut`
 - `prost-kotlin/prost` `src/encoding/length_delimiter.rs:5` — `use bytes::BufMut`
 - `prost-kotlin/prost` `src/message.rs:5` — `use bytes::BufMut`
 - `rama-core-kotlin/rama-core` `src/stream/json/codec.rs:1` — `use bytes::BufMut`
 - `reqwest-kotlin/reqwest` `src/blocking/body.rs:275` — `use bytes::BufMut`
 - `tokio-kotlin/tokio` `src/io/util/async_read_ext.rs:16` — `use bytes::BufMut`
-- `tokio-kotlin/tokio` `src/io/util/read_buf.rs:2` — `use bytes::BufMut`
-- _… and 31 more site(s)._
+- _… and 33 more site(s)._
 
-#### `bytes::Buf` — 29 site(s) (0 codex, 29 other, 10 caller crates)
+#### `bytes::Buf` — 39 site(s) (0 codex, 39 other, 12 caller crates)
 
+- `parquet-kotlin/parquet` `examples/read_with_rowgroup.rs:19` — `use bytes::Buf`
+- `parquet-kotlin/parquet` `src/arrow/in_memory_row_group.rs:27` — `use bytes::Buf`
+- `parquet-kotlin/parquet` `src/file/reader.rs:1` — `use bytes::Buf`
+- `parquet-kotlin/parquet` `src/file/serialized_reader.rs:1302` — `use bytes::Buf`
 - `prost-kotlin/prost` `benches/varint.rs:2` — `use bytes::Buf`
 - `prost-kotlin/prost` `src/encoding/length_delimiter.rs:5` — `use bytes::Buf`
 - `prost-kotlin/prost` `src/message.rs:5` — `use bytes::Buf`
@@ -82,11 +86,7 @@ Sorted by codex demand, then total demand. The first symbols are the priority qu
 - `rmcp-kotlin/rmcp` `src/transport/common/server_side_http.rs:3` — `use bytes::Buf`
 - `sse-stream-kotlin/sse-stream` `src/stream.rs:9` — `use bytes::Buf`
 - `tokio-kotlin/tokio` `src/io/util/async_write_ext.rs:19` — `use bytes::Buf`
-- `tokio-kotlin/tokio` `src/io/util/mem.rs:5` — `use bytes::Buf`
-- `tokio-kotlin/tokio` `src/io/util/read_int.rs:2` — `use bytes::Buf`
-- `tokio-kotlin/tokio` `src/io/util/write_all_buf.rs:2` — `use bytes::Buf`
-- `tokio-kotlin/tokio` `src/io/util/write_buf.rs:2` — `use bytes::Buf`
-- _… and 17 more site(s)._
+- _… and 27 more site(s)._
 
 #### `::bytes::Buf` — 3 site(s) (0 codex, 3 other, 1 caller crates)
 
