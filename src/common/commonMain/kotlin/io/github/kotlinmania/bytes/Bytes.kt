@@ -126,7 +126,8 @@ public class Bytes private constructor(
          * Creates a new `Bytes` with length zero and the given pointer as the address.
          */
         private fun newEmptyWithPtr(index: Int): Bytes {
-            require(index >= 0)
+            val resolved = withoutProvenance(index)
+            require(resolved >= 0)
             return Bytes(SharedBytes(ByteArray(0), isStatic = true, owner = false), 0, 0)
         }
 
@@ -159,6 +160,36 @@ public class Bytes private constructor(
         public fun fromIter(intoIter: Iterable<Byte>): Bytes = from(intoIter)
 
         public fun default(): Bytes = new()
+
+        internal fun fromSharedView(
+            shared: SharedBytes,
+            start: Int,
+            length: Int,
+        ): Bytes = Bytes(shared, start, length)
+
+        /**
+         * Constructs a [Bytes] handle from an explicit backing slice, range, opaque data, and [Vtable].
+         */
+        internal fun withVtable(
+            bytes: ByteArray,
+            start: Int,
+            len: Int,
+            data: Any?,
+            vtable: Vtable,
+        ): Bytes {
+            val refCount = (data as? Shared)?.refCnt ?: (data as? Owned<*>)?.refCnt ?: 1
+            return when (vtable) {
+                STATIC_VTABLE -> fromStatic(bytes.copyOfRange(start, start + len))
+                OWNED_VTABLE -> fromOwner(bytes.copyOfRange(start, start + len))
+                else -> {
+                    val sharedBytes =
+                        SharedBytes(bytes.copyOf(), isStatic = false, owner = false).apply {
+                            this.refCount = refCount
+                        }
+                    fromSharedView(sharedBytes, start, len)
+                }
+            }
+        }
     }
 
     /**
@@ -432,7 +463,8 @@ public class Bytes private constructor(
      */
     public fun tryIntoMut(): Result<BytesMut> =
         if (isUnique()) {
-            Result.success(BytesMut.from(asSlice()))
+            val handle = Shared(shared.bytes).apply { refCnt = shared.refCount }
+            Result.success(SHARED_VTABLE.intoMut(handle, shared.bytes, start, length))
         } else {
             Result.failure(IllegalStateException("Bytes is not unique"))
         }
@@ -456,7 +488,7 @@ public class Bytes private constructor(
     public fun cmp(other: Bytes): Int = compareTo(other)
 }
 
-private class SharedBytes(
+internal class SharedBytes(
     val bytes: ByteArray,
     val isStatic: Boolean,
     val owner: Boolean,
@@ -476,26 +508,24 @@ private class SharedBytes(
 // between an immutable byte-array view and a reference-counted Shared view
 // at the moment of first sharing.
 //
-// Kotlin has neither low-level memory addresss nor pointer-tagging, so the vtable
+// Kotlin has neither low-level memory addresses nor pointer-tagging, so the vtable
 // scaffolding below preserves the *function names and per-variant semantics*
-// without trying to reproduce the pointer-bit layout. The currently-published
-// `Bytes` class above continues to back its storage on `SharedBytes`; the
-// vtable surface here exists alongside it so consumers and future internal
-// callers can route through a canonical Vtable instance, and so the porting tool
-// preserves the function-by-function structure of upstream's bytes.rs for the porting tools.
+// without trying to reproduce the pointer-bit layout. The `Bytes` class above
+// backs its storage on `SharedBytes`, and `tryIntoMut` / `BytesMut` vtables
+// dispatch directly through the five-slot `Vtable`.
 
 /**
  * Vtable of polymorphic operations for [Bytes] storage.
  *
  * Each function receives the variant-specific opaque [data] handle plus the visible byte
  * region (`bytes` + `start` + `len`). The five upstream variant tables (Static, Owned,
- * Promotable Even, Promotable Odd, Shared) each populate this struct with their own
- * implementation of clone/intoVec/isUnique/drop. The `intoMut` slot is intentionally
- * elided in this revision and will be reinstated once `BytesMut` is ported.
+ * Promotable Even, Promotable Odd, Shared) each populate all five slots: `clone`,
+ * `intoVec`, `intoMut`, `isUnique`, and `drop`.
  */
 internal class Vtable(
     val clone: (data: Any?, bytes: ByteArray, start: Int, len: Int) -> Bytes,
     val intoVec: (data: Any?, bytes: ByteArray, start: Int, len: Int) -> ByteArray,
+    val intoMut: (data: Any?, bytes: ByteArray, start: Int, len: Int) -> BytesMut,
     val isUnique: (data: Any?) -> Boolean,
     val drop: (data: Any?) -> Unit,
 )
@@ -515,6 +545,7 @@ internal class Owned<T : Any>(
             Vtable(
                 clone = ::ownedClone,
                 intoVec = ::ownedToVec,
+                intoMut = ::ownedToMut,
                 isUnique = ::ownedIsUnique,
                 drop = ::ownedDrop,
             )
@@ -537,6 +568,7 @@ internal val STATIC_VTABLE: Vtable =
     Vtable(
         clone = ::staticClone,
         intoVec = ::staticToVec,
+        intoMut = ::staticToMut,
         isUnique = ::staticIsUnique,
         drop = ::staticDrop,
     )
@@ -544,20 +576,22 @@ internal val STATIC_VTABLE: Vtable =
 /** Owned vtable for [Bytes] backed by an external owner. */
 internal val OWNED_VTABLE: Vtable = Owned.VTABLE
 
-/** Promotable-even vtable: backing is an even-aligned `underlying byte array` boxed slice; promotes lazily to Shared. */
+/** Promotable-even vtable: backing is an even-aligned boxed slice; promotes lazily to Shared. */
 internal val PROMOTABLE_EVEN_VTABLE: Vtable =
     Vtable(
         clone = ::promotableEvenClone,
         intoVec = ::promotableEvenToVec,
+        intoMut = ::promotableEvenToMut,
         isUnique = ::promotableIsUnique,
         drop = ::promotableEvenDrop,
     )
 
-/** Promotable-odd vtable: backing is an odd-aligned `underlying byte array` boxed slice; promotes lazily to Shared. */
+/** Promotable-odd vtable: backing is an odd-aligned boxed slice; promotes lazily to Shared. */
 internal val PROMOTABLE_ODD_VTABLE: Vtable =
     Vtable(
         clone = ::promotableOddClone,
         intoVec = ::promotableOddToVec,
+        intoMut = ::promotableOddToMut,
         isUnique = ::promotableIsUnique,
         drop = ::promotableOddDrop,
     )
@@ -567,6 +601,7 @@ internal val SHARED_VTABLE: Vtable =
     Vtable(
         clone = ::sharedClone,
         intoVec = ::sharedToVec,
+        intoMut = ::sharedToMut,
         isUnique = ::sharedIsUnique,
         drop = ::sharedDrop,
     )
@@ -581,6 +616,11 @@ private fun staticClone(data: Any?, bytes: ByteArray, start: Int, len: Int): Byt
 private fun staticToVec(data: Any?, bytes: ByteArray, start: Int, len: Int): ByteArray {
     // Materialize the static slice into a fresh, independently-owned byte array.
     return bytes.copyOfRange(start, start + len)
+}
+
+private fun staticToMut(data: Any?, bytes: ByteArray, start: Int, len: Int): BytesMut {
+    // Static memory is read-only; convert by copying into a fresh BytesMut.
+    return BytesMut.fromVec(bytes.copyOfRange(start, start + len))
 }
 
 private fun staticIsUnique(data: Any?): Boolean {
@@ -605,6 +645,12 @@ private fun ownedToVec(data: Any?, bytes: ByteArray, start: Int, len: Int): Byte
     return bytes.copyOfRange(start, start + len)
 }
 
+private fun ownedToMut(data: Any?, bytes: ByteArray, start: Int, len: Int): BytesMut {
+    // Owner-backed buffers always copy on conversion to BytesMut (mirrors the upstream contract
+    // documented on the fromOwner factory).
+    return BytesMut.fromVec(bytes.copyOfRange(start, start + len))
+}
+
 private fun ownedIsUnique(data: Any?): Boolean {
     // Owner-backed buffers always report not-unique because the external owner may still
     // hold the storage even when refCount equals 1.
@@ -625,37 +671,47 @@ private fun ownedDrop(data: Any?) {
 // ---------------- Promotable variant helpers ----------------
 
 private fun promotableEvenClone(data: Any?, bytes: ByteArray, start: Int, len: Int): Bytes {
-    // First clone of a promotable buffer promotes it to Shared and bumps the refcount; both
-    // the original and the clone observe Shared semantics from this point forward. The Kotlin
-    // port's `Bytes` already routes through SharedBytes refcounting, so the surface is a
-    // direct copy followed by a refcount step on the materialised Shared instance.
     val shared = data as Shared
-    shallowCloneArc(shared)
-    return Bytes.from(bytes.copyOfRange(start, start + len))
+    return shallowCloneVec(shared, bytes, start, len)
 }
 
-private fun promotableEvenToVec(data: Any?, bytes: ByteArray, start: Int, len: Int): ByteArray {
-    // Surface a stand-alone copy of the visible region; the underlying underlying byte array is shared and
-    // may not be mutated through this view.
-    return bytes.copyOfRange(start, start + len)
-}
+private fun promotableToVec(data: Any?, bytes: ByteArray, start: Int, len: Int): ByteArray =
+    (data as? Shared)?.buf?.copyOfRange(start, start + len) ?: bytes.copyOfRange(start, start + len)
+
+private fun promotableToMut(data: Any?, bytes: ByteArray, start: Int, len: Int): BytesMut =
+    BytesMut.fromVec(promotableToVec(data, bytes, start, len))
+
+private fun promotableEvenToVec(data: Any?, bytes: ByteArray, start: Int, len: Int): ByteArray =
+    promotableToVec(data, bytes, start, len)
+
+private fun promotableEvenToMut(data: Any?, bytes: ByteArray, start: Int, len: Int): BytesMut =
+    promotableToMut(data, bytes, start, len)
 
 private fun promotableEvenDrop(data: Any?) {
     val shared = data as? Shared ?: return
     releaseShared(shared)
+    if (shared.refCnt <= 0) {
+        freeBoxedSlice(shared)
+    }
 }
 
 private fun promotableOddClone(data: Any?, bytes: ByteArray, start: Int, len: Int): Bytes {
     val shared = data as Shared
-    shallowCloneArc(shared)
-    return Bytes.from(bytes.copyOfRange(start, start + len))
+    return shallowCloneVec(shared, bytes, start, len)
 }
 
-private fun promotableOddToVec(data: Any?, bytes: ByteArray, start: Int, len: Int): ByteArray = bytes.copyOfRange(start, start + len)
+private fun promotableOddToVec(data: Any?, bytes: ByteArray, start: Int, len: Int): ByteArray =
+    promotableToVec(data, bytes, start, len)
+
+private fun promotableOddToMut(data: Any?, bytes: ByteArray, start: Int, len: Int): BytesMut =
+    promotableToMut(data, bytes, start, len)
 
 private fun promotableOddDrop(data: Any?) {
     val shared = data as? Shared ?: return
     releaseShared(shared)
+    if (shared.refCnt <= 0) {
+        freeBoxedSlice(shared)
+    }
 }
 
 private fun promotableIsUnique(data: Any?): Boolean {
@@ -663,12 +719,17 @@ private fun promotableIsUnique(data: Any?): Boolean {
     return shared.refCnt == 1
 }
 
+private fun freeBoxedSlice(shared: Shared) {
+    // Clamp refcount at zero when the final promotable reference is dropped.
+    shared.refCnt = 0
+}
+
 // ---------------- Shared variant helpers ----------------
 
 private fun sharedClone(data: Any?, bytes: ByteArray, start: Int, len: Int): Bytes {
     val shared = data as Shared
     shallowCloneArc(shared)
-    return Bytes.from(bytes.copyOfRange(start, start + len))
+    return Bytes.withVtable(bytes, start, len, shared, SHARED_VTABLE)
 }
 
 private fun sharedToVecImpl(shared: Shared, start: Int, len: Int): ByteArray {
@@ -683,6 +744,14 @@ private fun sharedToVecImpl(shared: Shared, start: Int, len: Int): ByteArray {
 private fun sharedToVec(data: Any?, bytes: ByteArray, start: Int, len: Int): ByteArray {
     val shared = data as Shared
     return sharedToVecImpl(shared, start, len)
+}
+
+private fun sharedToMutImpl(shared: Shared, start: Int, len: Int): BytesMut =
+    BytesMut.fromVec(shared.buf.copyOfRange(start, start + len))
+
+private fun sharedToMut(data: Any?, bytes: ByteArray, start: Int, len: Int): BytesMut {
+    val shared = data as Shared
+    return sharedToMutImpl(shared, start, len)
 }
 
 private fun sharedIsUnique(data: Any?): Boolean {
@@ -701,11 +770,25 @@ private fun shallowCloneArc(shared: Shared) {
     shared.refCnt += 1
 }
 
+private fun shallowCloneVec(shared: Shared, bytes: ByteArray, start: Int, len: Int): Bytes {
+    // Promote an array-backed view to shared reference-counted storage and return a clone.
+    shallowCloneArc(shared)
+    return Bytes.withVtable(bytes, start, len, shared, SHARED_VTABLE)
+}
+
 private fun releaseShared(shared: Shared) {
     shared.refCnt -= 1
     // GC reclaims the underlying buffer when the last reference falls; the explicit refcount
     // step preserves isUnique observability.
 }
+
+internal fun ptrMap(
+    bytes: ByteArray,
+    start: Int,
+    transform: (ByteArray, Int) -> Pair<ByteArray, Int>,
+): Pair<ByteArray, Int> = transform(bytes, start)
+
+internal fun withoutProvenance(addr: Int): Int = addr
 
 private fun Iterable<Byte>.toByteArray(): ByteArray {
     val bytes = toList()
