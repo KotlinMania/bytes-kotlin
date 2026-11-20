@@ -102,7 +102,7 @@ terms or conditions.
 
 ```kotlin
 dependencies {
-    implementation("io.github.kotlinmania:bytes-kotlin:0.2.3")
+    implementation("io.github.kotlinmania:bytes-kotlin:0.2.4")
 }
 ```
 

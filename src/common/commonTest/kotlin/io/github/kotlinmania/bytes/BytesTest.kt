@@ -235,4 +235,52 @@ class BytesTest {
         }
         assertContentEquals("xyz".encodeToByteArray(), collected.toByteArray())
     }
+
+    @Test
+    fun vtableIntoMutAndWithVtableAcrossAllVariants() {
+        val raw = "hello vtable".encodeToByteArray()
+
+        val staticMut = STATIC_VTABLE.intoMut(null, raw, 0, 5)
+        assertContentEquals("hello".encodeToByteArray(), staticMut.asRef())
+        assertFalse(STATIC_VTABLE.isUnique(null))
+        assertContentEquals("vtable".encodeToByteArray(), STATIC_VTABLE.intoVec(null, raw, 6, 6))
+        STATIC_VTABLE.drop(null)
+
+        val owner = Owned("backing")
+        val ownedMut = OWNED_VTABLE.intoMut(owner, raw, 0, 5)
+        assertContentEquals("hello".encodeToByteArray(), ownedMut.asRef())
+        assertFalse(OWNED_VTABLE.isUnique(owner))
+        OWNED_VTABLE.drop(owner)
+        assertEquals(0, owner.refCnt)
+
+        val promoShared = Shared(raw)
+        assertTrue(PROMOTABLE_EVEN_VTABLE.isUnique(promoShared))
+        val clonedEven = PROMOTABLE_EVEN_VTABLE.clone(promoShared, raw, 6, 6)
+        assertTrue(clonedEven.eq("vtable"))
+        assertEquals(2, promoShared.refCnt)
+        assertContentEquals("hello".encodeToByteArray(), PROMOTABLE_EVEN_VTABLE.intoMut(promoShared, raw, 0, 5).asRef())
+        PROMOTABLE_EVEN_VTABLE.drop(promoShared)
+        PROMOTABLE_EVEN_VTABLE.drop(promoShared)
+        assertEquals(0, promoShared.refCnt)
+
+        val oddShared = Shared(raw)
+        val clonedOdd = PROMOTABLE_ODD_VTABLE.clone(oddShared, raw, 0, 5)
+        assertTrue(clonedOdd.eq("hello"))
+        assertContentEquals("vtable".encodeToByteArray(), PROMOTABLE_ODD_VTABLE.intoMut(oddShared, raw, 6, 6).asRef())
+        PROMOTABLE_ODD_VTABLE.drop(oddShared)
+        PROMOTABLE_ODD_VTABLE.drop(oddShared)
+        assertEquals(0, oddShared.refCnt)
+
+        val shared = Shared(raw)
+        assertTrue(SHARED_VTABLE.isUnique(shared))
+        assertContentEquals("hello".encodeToByteArray(), SHARED_VTABLE.intoMut(shared, raw, 0, 5).asRef())
+        val sharedView = Bytes.withVtable(raw, 6, 6, shared, SHARED_VTABLE)
+        assertTrue(sharedView.eq("vtable"))
+        val frozenMut = sharedView.tryIntoMut().getOrThrow().freeze()
+        assertTrue(frozenMut.eq("vtable"))
+
+        val mapped = ptrMap(raw, 6) { buf, start -> buf to (start + 1) }
+        assertEquals(7, mapped.second)
+        assertEquals(42, withoutProvenance(42))
+    }
 }

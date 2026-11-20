@@ -45,10 +45,19 @@ import io.github.kotlinmania.serdecore.ser.Serializer
  * check(buf.capacity() == 64)
  * ```
  */
+internal const val KIND_ARC: Int = 0b0
+internal const val KIND_VEC: Int = 0b1
+
+private const val MAX_ORIGINAL_CAPACITY_WIDTH: Int = 17
+private const val MIN_ORIGINAL_CAPACITY_WIDTH: Int = 10
+
 public class BytesMut private constructor(
     private var data: ByteArray,
     private var start: Int,
     private var length: Int,
+    private var kindTag: Int = KIND_VEC,
+    private var sharedState: Shared? = null,
+    private var originalCapRepr: Int = originalCapacityToRepr(data.size),
 ) : Buf,
     BufMut,
     Serialize {
@@ -85,9 +94,22 @@ public class BytesMut private constructor(
         }
 
         /**
+         * Creates a [BytesMut] directly from an existing [vec] buffer without copying.
+         */
+        internal fun fromVec(vec: ByteArray): BytesMut =
+            BytesMut(
+                data = vec,
+                start = 0,
+                length = vec.size,
+                kindTag = KIND_VEC,
+                sharedState = null,
+                originalCapRepr = originalCapacityToRepr(vec.size),
+            )
+
+        /**
          * Creates a [BytesMut] from a byte slice, copying the bytes.
          */
-        public fun from(src: ByteArray): BytesMut = BytesMut(src.copyOf(), 0, src.size)
+        public fun from(src: ByteArray): BytesMut = fromVec(src.copyOf())
 
         /**
          * Creates a [BytesMut] from a string, encoding it as UTF-8.
@@ -251,6 +273,8 @@ public class BytesMut private constructor(
         data.copyInto(newData, 0, start, start + length)
         data = newData
         start = 0
+        kindTag = KIND_VEC
+        sharedState = null
         return true
     }
 
@@ -286,18 +310,90 @@ public class BytesMut private constructor(
      * this method degenerates to `self.extendFromSlice(other.asSlice())`.
      */
     public fun unsplit(other: BytesMut) {
-        if (length == 0) {
+        if (tryUnsplit(other).isFailure) {
+            extendFromSlice(other.asSlice())
+        }
+    }
+
+    internal fun tryUnsplit(other: BytesMut): Result<Unit> {
+        if (other.capacity() == 0) {
+            return Result.success(Unit)
+        }
+        if (length == 0 && kind() == KIND_VEC) {
             data = other.data
             start = other.start
             length = other.length
+            kindTag = other.kindTag
+            sharedState = other.sharedState
+            originalCapRepr = other.originalCapRepr
+            return Result.success(Unit)
+        }
+        val currentShared = sharedState
+        val otherShared = other.sharedState
+        if (kind() == KIND_ARC &&
+            other.kind() == KIND_ARC &&
+            currentShared != null &&
+            currentShared === otherShared &&
+            start + length == other.start
+        ) {
+            length += other.length
+            return Result.success(Unit)
+        }
+        return Result.failure(IllegalStateException("BytesMut buffers cannot be unsplit in O(1)"))
+    }
+
+    internal fun kind(): Int = kindTag
+
+    internal fun getVecPos(): Int = start
+
+    internal fun setVecPos(pos: Int) {
+        start = pos
+    }
+
+    internal fun promoteToShared(refCnt: Int = 1) {
+        require(refCnt == 1 || refCnt == 2) { "invalid refCnt for promoteToShared: $refCnt" }
+        val currentShared = sharedState
+        if (kind() == KIND_ARC && currentShared != null) {
             return
         }
-        // Defer to extendFromSlice; the upstream contiguous-fast-path assumes raw pointer
-        // arithmetic that has no Kotlin equivalent.
-        extendFromSlice(other.asSlice())
+        val rebuilt = rebuildVec(data, start + length, originalCapacityFromRepr(originalCapRepr).coerceAtLeast(capacity()))
+        val shared = Shared(rebuilt).apply { this.refCnt = refCnt }
+        data = rebuilt
+        sharedState = shared
+        kindTag = KIND_ARC
+    }
+
+    internal fun shallowClone(): BytesMut {
+        if (kind() == KIND_ARC) {
+            incrementShared(checkNotNull(sharedState))
+        } else {
+            promoteToShared(refCnt = 2)
+        }
+        return BytesMut(
+            data = data,
+            start = start,
+            length = length,
+            kindTag = kindTag,
+            sharedState = sharedState,
+            originalCapRepr = originalCapRepr,
+        )
+    }
+
+    internal fun advanceUnchecked(cnt: Int) {
+        if (cnt == 0) {
+            return
+        }
+        if (kind() == KIND_VEC) {
+            setVecPos(getVecPos() + cnt)
+        } else {
+            start += cnt
+        }
+        length = (length - cnt).coerceAtLeast(0)
     }
 
     private fun asSlice(): ByteArray = data.copyOfRange(start, start + length)
+
+    internal fun asSliceMut(): ByteArray = data
 
     /**
      * Returns the remaining spare capacity of the buffer as an [UninitSlice].
@@ -328,7 +424,7 @@ public class BytesMut private constructor(
 
     public fun deref(): ByteArray = asSlice()
 
-    public fun derefMut(): ByteArray = data
+    public fun derefMut(): ByteArray = asSliceMut()
 
     public fun asRef(): ByteArray = asSlice()
 
@@ -342,11 +438,11 @@ public class BytesMut private constructor(
         data[start + index] = value
     }
 
-    public fun asMut(): ByteArray = data
+    public fun asMut(): ByteArray = asSliceMut()
 
     public fun borrow(): ByteArray = asSlice()
 
-    public fun borrowMut(): ByteArray = data
+    public fun borrowMut(): ByteArray = asSliceMut()
 
     /** Mirrors the upstream `From<&[u8]>` constructor. */
     public fun from(src: ByteArray): BytesMut = BytesMut.from(src)
@@ -402,8 +498,7 @@ public class BytesMut private constructor(
 
     override fun advance(cnt: Int) {
         check(cnt <= length) { "cannot advance past `remaining`: $cnt <= $length" }
-        start += cnt
-        length -= cnt
+        advanceUnchecked(cnt)
     }
 
     override fun copyToBytes(len: Int): Bytes {
@@ -469,3 +564,95 @@ private fun compareByteArrays(left: ByteArray, right: ByteArray): Int {
     }
     return left.size.compareTo(right.size)
 }
+
+internal fun incrementShared(shared: Shared) {
+    shared.refCnt += 1
+}
+
+private fun releaseShared(shared: Shared) {
+    shared.refCnt -= 1
+}
+
+internal fun isUniqueShared(shared: Shared): Boolean = shared.refCnt == 1
+
+internal fun originalCapacityToRepr(cap: Int): Int {
+    if (cap <= 0) {
+        return 0
+    }
+    val width = 32 - (cap.toUInt() shr MIN_ORIGINAL_CAPACITY_WIDTH).countLeadingZeroBits()
+    return minOf(width, MAX_ORIGINAL_CAPACITY_WIDTH - MIN_ORIGINAL_CAPACITY_WIDTH)
+}
+
+internal fun originalCapacityFromRepr(repr: Int): Int {
+    if (repr == 0) {
+        return 0
+    }
+    return 1 shl (repr + (MIN_ORIGINAL_CAPACITY_WIDTH - 1))
+}
+
+internal fun rebuildVec(
+    buf: ByteArray,
+    len: Int,
+    cap: Int,
+): ByteArray {
+    val targetSize = maxOf(buf.size, len, cap)
+    return if (targetSize == buf.size) buf.copyOf() else buf.copyOf(targetSize)
+}
+
+private fun sharedVClone(
+    data: Any?,
+    bytes: ByteArray,
+    start: Int,
+    len: Int,
+): Bytes {
+    val shared = data as Shared
+    incrementShared(shared)
+    return Bytes.withVtable(bytes, start, len, shared, SHARED_VTABLE)
+}
+
+private fun sharedVToVec(
+    data: Any?,
+    bytes: ByteArray,
+    start: Int,
+    len: Int,
+): ByteArray {
+    val shared = data as Shared
+    val out = shared.buf.copyOfRange(start, start + len)
+    releaseShared(shared)
+    return out
+}
+
+private fun sharedVToMut(
+    data: Any?,
+    bytes: ByteArray,
+    start: Int,
+    len: Int,
+): BytesMut {
+    val shared = data as Shared
+    if (isUniqueShared(shared)) {
+        return BytesMut.fromVec(shared.buf.copyOfRange(start, start + len))
+    }
+    val copied = shared.buf.copyOfRange(start, start + len)
+    releaseShared(shared)
+    return BytesMut.fromVec(copied)
+}
+
+private fun sharedVIsUnique(data: Any?): Boolean {
+    val shared = data as? Shared ?: return false
+    return isUniqueShared(shared)
+}
+
+private fun sharedVDrop(data: Any?) {
+    val shared = data as? Shared ?: return
+    releaseShared(shared)
+}
+
+/** Shared vtable for frozen [BytesMut] storage backed by [Shared]. */
+internal val SHARED_BYTES_MUT_VTABLE: Vtable =
+    Vtable(
+        clone = ::sharedVClone,
+        intoVec = ::sharedVToVec,
+        intoMut = ::sharedVToMut,
+        isUnique = ::sharedVIsUnique,
+        drop = ::sharedVDrop,
+    )

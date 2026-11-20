@@ -5,6 +5,7 @@ import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFails
+import kotlin.test.assertFalse
 import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
 
@@ -367,5 +368,87 @@ class BytesMutTest {
         val populated = BytesMut.new()
         populated.put(BytesMut.from(byteArrayOf(1, 2, 3)))
         assertContentEquals(byteArrayOf(1, 2, 3), populated.asRef())
+    }
+
+    @Test
+    fun bytesMutCloningFrozen() {
+        val taken = BytesMut.from("abcdefgh".encodeToByteArray()).split()
+        val frozen = taken.freeze()
+        val clone1 = frozen.clone()
+        val clone2 = frozen.clone()
+        assertTrue(clone1.eq("abcdefgh"))
+        assertTrue(clone2.eq("abcdefgh"))
+    }
+
+    @Test
+    fun vtableHelpersAndSharedBytesMutLifecycle() {
+        val raw = "abcdefgh".encodeToByteArray()
+        val fromVecBuf = BytesMut.fromVec(raw.copyOf())
+        assertEquals(KIND_VEC, fromVecBuf.kind())
+        assertEquals(0, fromVecBuf.getVecPos())
+
+        fromVecBuf.advanceUnchecked(3)
+        assertEquals(3, fromVecBuf.getVecPos())
+        assertContentEquals("defgh".encodeToByteArray(), fromVecBuf.asRef())
+
+        fromVecBuf.promoteToShared(refCnt = 1)
+        assertEquals(KIND_ARC, fromVecBuf.kind())
+
+        val shallow = fromVecBuf.shallowClone()
+        assertContentEquals("defgh".encodeToByteArray(), shallow.asRef())
+
+        val tail = BytesMut.fromVec("xyz".encodeToByteArray())
+        assertTrue(fromVecBuf.tryUnsplit(tail).isFailure)
+        fromVecBuf.unsplit(tail)
+        assertContentEquals("defghxyz".encodeToByteArray(), fromVecBuf.asRef())
+
+        val shared = Shared("shared-bytes-mut".encodeToByteArray())
+        assertTrue(SHARED_BYTES_MUT_VTABLE.isUnique(shared))
+        val cloned = SHARED_BYTES_MUT_VTABLE.clone(shared, shared.buf, 0, 6)
+        assertTrue(cloned.eq("shared"))
+        assertFalse(SHARED_BYTES_MUT_VTABLE.isUnique(shared))
+        assertEquals(2, shared.refCnt)
+        assertContentEquals(
+            "shared".encodeToByteArray(),
+            SHARED_BYTES_MUT_VTABLE.intoMut(shared, shared.buf, 0, 6).asRef(),
+        )
+        assertTrue(SHARED_BYTES_MUT_VTABLE.isUnique(shared))
+        assertContentEquals(
+            "bytes".encodeToByteArray(),
+            SHARED_BYTES_MUT_VTABLE.intoVec(shared, shared.buf, 7, 5),
+        )
+        assertEquals(0, shared.refCnt)
+
+        val dropShared = Shared("drop-test".encodeToByteArray())
+        SHARED_BYTES_MUT_VTABLE.clone(dropShared, dropShared.buf, 0, 4)
+        assertFalse(SHARED_BYTES_MUT_VTABLE.isUnique(dropShared))
+        SHARED_BYTES_MUT_VTABLE.drop(dropShared)
+        assertTrue(SHARED_BYTES_MUT_VTABLE.isUnique(dropShared))
+    }
+
+    @Test
+    fun testOriginalCapacityToAndFromRepr() {
+        assertEquals(0, originalCapacityToRepr(0))
+        assertEquals(0, originalCapacityFromRepr(0))
+
+        for (width in 1..30) {
+            val cap = 1 shl (width - 1)
+            val expected =
+                when {
+                    width < 10 -> 0
+                    width < 17 -> width - 10
+                    else -> 7
+                }
+            assertEquals(expected, originalCapacityToRepr(cap))
+            if (width > 1) {
+                assertEquals(expected, originalCapacityToRepr(cap + 1))
+            }
+        }
+
+        val minCap = 1 shl 10
+        assertEquals(minCap, originalCapacityFromRepr(1))
+        assertEquals(minCap * 2, originalCapacityFromRepr(2))
+        assertEquals(minCap * 4, originalCapacityFromRepr(3))
+        assertEquals(minCap * 8, originalCapacityFromRepr(4))
     }
 }
