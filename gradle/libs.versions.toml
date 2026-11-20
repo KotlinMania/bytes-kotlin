@@ -10,8 +10,8 @@ detekt = "2.0.0-alpha.6"
 ktlint = "14.2.0"
 ktlintEngine = "1.8.0"
 kotlinxBenchmark = "0.5.0"
-serdeKotlin = "0.1.10"
-serdeTest = "0.1.1"
+serdeKotlin = "0.1.12"
+serdeTest = "0.1.2"
 
 [plugins]
 android-kotlin-multiplatform-library = { id = "com.android.kotlin.multiplatform.library", version.ref = "androidKmp" }

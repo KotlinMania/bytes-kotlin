@@ -35,7 +35,7 @@ class BufMutPutSliceDispatchParityTest {
         val recorder = RecordingPutSliceBufMut()
         val u128Val = U128(0x0102030405060708uL, 0x090a0b0c0d0e0f10uL)
         val i128Val = I128(-0x0102030405060708L, 0x1112131415161718uL)
-        val rawF32Nan = Float.fromBits(0x7fa12345)
+        val rawF32Nan = Float.fromBits(0x7fe12345)
         val rawF64Nan = Double.fromBits(0x7ff4_0102_0304_0506L)
 
         val cases: List<Pair<() -> Unit, ByteArray>> =
@@ -106,9 +106,9 @@ class BufMutPutSliceDispatchParityTest {
                 ({ recorder.putIntLe(0x0504010203L, 3) }) to byteArrayOf(3, 2, 1),
                 ({ recorder.putIntNe(-0x010204L, 3) }) to
                     byteArrayOf(0xfc.toByte(), 0xfd.toByte(), 0xfe.toByte()),
-                ({ recorder.putF32(rawF32Nan) }) to byteArrayOf(0x7f, 0xa1.toByte(), 0x23, 0x45),
-                ({ recorder.putF32Le(rawF32Nan) }) to byteArrayOf(0x45, 0x23, 0xa1.toByte(), 0x7f),
-                ({ recorder.putF32Ne(rawF32Nan) }) to byteArrayOf(0x45, 0x23, 0xa1.toByte(), 0x7f),
+                ({ recorder.putF32(rawF32Nan) }) to byteArrayOf(0x7f, 0xe1.toByte(), 0x23, 0x45),
+                ({ recorder.putF32Le(rawF32Nan) }) to byteArrayOf(0x45, 0x23, 0xe1.toByte(), 0x7f),
+                ({ recorder.putF32Ne(rawF32Nan) }) to byteArrayOf(0x45, 0x23, 0xe1.toByte(), 0x7f),
                 ({ recorder.putF64(rawF64Nan) }) to
                     byteArrayOf(0x7f, 0xf4.toByte(), 0x01, 0x02, 0x03, 0x04, 0x05, 0x06),
                 ({ recorder.putF64Le(rawF64Nan) }) to
@@ -293,7 +293,7 @@ class BufMutPutSliceDispatchParityTest {
                 }
             }
 
-        val nan32 = Float.fromBits(0x7fa12345)
+        val nan32 = Float.fromBits(0x7fe12345)
         val nan64 = Double.fromBits(0x7ff4_0102_0304_0506L)
         intOverrideSink.putF32(nan32)
         intOverrideSink.putF32Le(nan32)
@@ -304,9 +304,9 @@ class BufMutPutSliceDispatchParityTest {
 
         assertEquals(
             listOf(
-                "u32_be" to 0x7fa12345uL,
-                "u32_le" to 0x7fa12345uL,
-                "u32_ne" to 0x7fa12345uL,
+                "u32_be" to 0x7fe12345uL,
+                "u32_le" to 0x7fe12345uL,
+                "u32_ne" to 0x7fe12345uL,
                 "u64_be" to 0x7ff4_0102_0304_0506uL,
                 "u64_le" to 0x7ff4_0102_0304_0506uL,
                 "u64_ne" to 0x7ff4_0102_0304_0506uL,

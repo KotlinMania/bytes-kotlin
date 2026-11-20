@@ -5,6 +5,7 @@ import io.github.kotlinmania.serde.SerdeResult
 import io.github.kotlinmania.serdecore.de.Deserializer
 import io.github.kotlinmania.serdecore.de.I8Deserialize
 import io.github.kotlinmania.serdecore.de.SeqAccess
+import io.github.kotlinmania.serdecore.de.SeqElement
 import io.github.kotlinmania.serdecore.de.Visitor
 import io.github.kotlinmania.serdecore.ser.Serializer
 import kotlin.math.min
@@ -27,12 +28,16 @@ private data object BytesVisitor : Visitor<Bytes> {
         val len = min(access.sizeHint() ?: 0, 4096)
         val values = ArrayList<Byte>(len)
         while (true) {
-            val next =
-                access.nextElement(I8Deserialize).fold(
-                    onSuccess = { it },
-                    onFailure = { return SerdeResult.failure(it) },
-                ) ?: break
-            values.add(next)
+            when (
+                val elem =
+                    access.nextElement(I8Deserialize).fold(
+                        onSuccess = { it },
+                        onFailure = { return SerdeResult.failure(it) },
+                    )
+            ) {
+                is SeqElement.Some -> values.add(elem.value)
+                SeqElement.None -> break
+            }
         }
         return SerdeResult.success(Bytes.from(values.toByteArray()))
     }
@@ -67,12 +72,16 @@ private data object BytesMutVisitor : Visitor<BytesMut> {
         val len = min(access.sizeHint() ?: 0, 4096)
         val values = ArrayList<Byte>(len)
         while (true) {
-            val next =
-                access.nextElement(I8Deserialize).fold(
-                    onSuccess = { it },
-                    onFailure = { return SerdeResult.failure(it) },
-                ) ?: break
-            values.add(next)
+            when (
+                val elem =
+                    access.nextElement(I8Deserialize).fold(
+                        onSuccess = { it },
+                        onFailure = { return SerdeResult.failure(it) },
+                    )
+            ) {
+                is SeqElement.Some -> values.add(elem.value)
+                SeqElement.None -> break
+            }
         }
         return SerdeResult.success(BytesMut.from(values.toByteArray()))
     }

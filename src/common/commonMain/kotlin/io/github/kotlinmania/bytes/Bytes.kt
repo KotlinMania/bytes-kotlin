@@ -583,11 +583,6 @@ private fun staticToVec(data: Any?, bytes: ByteArray, start: Int, len: Int): Byt
     return bytes.copyOfRange(start, start + len)
 }
 
-private fun staticToMut(data: Any?, bytes: ByteArray, start: Int, len: Int): BytesMut {
-    // Static memory is read-only; convert by copying into a fresh BytesMut.
-    return BytesMut.from(bytes.copyOfRange(start, start + len))
-}
-
 private fun staticIsUnique(data: Any?): Boolean {
     // Static storage is conceptually shared with the program image; never reported unique.
     return false
@@ -608,12 +603,6 @@ private fun ownedClone(data: Any?, bytes: ByteArray, start: Int, len: Int): Byte
 private fun ownedToVec(data: Any?, bytes: ByteArray, start: Int, len: Int): ByteArray {
     // Per the upstream comment, converting an owner-backed Bytes to a byte array is always a copy.
     return bytes.copyOfRange(start, start + len)
-}
-
-private fun ownedToMut(data: Any?, bytes: ByteArray, start: Int, len: Int): BytesMut {
-    // Owner-backed buffers always copy on conversion to BytesMut (mirrors the upstream contract
-    // documented on the fromOwner factory).
-    return BytesMut.from(bytes.copyOfRange(start, start + len))
 }
 
 private fun ownedIsUnique(data: Any?): Boolean {
@@ -645,18 +634,11 @@ private fun promotableEvenClone(data: Any?, bytes: ByteArray, start: Int, len: I
     return Bytes.from(bytes.copyOfRange(start, start + len))
 }
 
-private fun promotableToVec(data: Any?, bytes: ByteArray, start: Int, len: Int): ByteArray =
-    promotableEvenToVec(data, bytes, start, len)
-
-private fun promotableToMut(data: Any?, bytes: ByteArray, start: Int, len: Int): BytesMut = BytesMut.from(bytes.copyOfRange(start, start + len))
-
 private fun promotableEvenToVec(data: Any?, bytes: ByteArray, start: Int, len: Int): ByteArray {
     // Surface a stand-alone copy of the visible region; the underlying underlying byte array is shared and
     // may not be mutated through this view.
     return bytes.copyOfRange(start, start + len)
 }
-
-private fun promotableEvenToMut(data: Any?, bytes: ByteArray, start: Int, len: Int): BytesMut = BytesMut.from(bytes.copyOfRange(start, start + len))
 
 private fun promotableEvenDrop(data: Any?) {
     val shared = data as? Shared ?: return
@@ -671,8 +653,6 @@ private fun promotableOddClone(data: Any?, bytes: ByteArray, start: Int, len: In
 
 private fun promotableOddToVec(data: Any?, bytes: ByteArray, start: Int, len: Int): ByteArray = bytes.copyOfRange(start, start + len)
 
-private fun promotableOddToMut(data: Any?, bytes: ByteArray, start: Int, len: Int): BytesMut = BytesMut.from(bytes.copyOfRange(start, start + len))
-
 private fun promotableOddDrop(data: Any?) {
     val shared = data as? Shared ?: return
     releaseShared(shared)
@@ -681,11 +661,6 @@ private fun promotableOddDrop(data: Any?) {
 private fun promotableIsUnique(data: Any?): Boolean {
     val shared = data as? Shared ?: return true
     return shared.refCnt == 1
-}
-
-private fun freeBoxedSlice(buf: ByteArray) {
-    // Boxed-slice deallocation is GC-driven in Kotlin; the helper is retained for structural
-    // parity with the upstream freeBoxedSlice symbol.
 }
 
 // ---------------- Shared variant helpers ----------------
@@ -710,13 +685,6 @@ private fun sharedToVec(data: Any?, bytes: ByteArray, start: Int, len: Int): Byt
     return sharedToVecImpl(shared, start, len)
 }
 
-private fun sharedToMutImpl(shared: Shared, start: Int, len: Int): BytesMut = BytesMut.from(shared.buf.copyOfRange(start, start + len))
-
-private fun sharedToMut(data: Any?, bytes: ByteArray, start: Int, len: Int): BytesMut {
-    val shared = data as Shared
-    return sharedToMutImpl(shared, start, len)
-}
-
 private fun sharedIsUnique(data: Any?): Boolean {
     val shared = data as? Shared ?: return false
     return shared.refCnt == 1
@@ -733,54 +701,10 @@ private fun shallowCloneArc(shared: Shared) {
     shared.refCnt += 1
 }
 
-private fun shallowCloneVec(shared: Shared, bytes: ByteArray, start: Int, len: Int): Bytes {
-    // Promote an array-backed Bytes to a fully-shared reference-counted handle and return a clone that observes
-    // the same buffer. The original Bytes must henceforth route through Shared semantics.
-    shallowCloneArc(shared)
-    return Bytes.from(bytes.copyOfRange(start, start + len))
-}
-
 private fun releaseShared(shared: Shared) {
     shared.refCnt -= 1
     // GC reclaims the underlying buffer when the last reference falls; the explicit refcount
     // step preserves isUnique observability.
-}
-
-private fun ptrMap(bytes: ByteArray, start: Int, transform: (ByteArray, Int) -> Pair<ByteArray, Int>): Pair<ByteArray, Int> {
-    // Mirrors upstream ptrMap, which performs pointer arithmetic to relocate the visible
-    // region within an underlying allocation. Kotlin has no low-level memory addresss; the operation is
-    // expressed as an index transform on the same backing buffer.
-    return transform(bytes, start)
-}
-
-private fun withoutProvenance(addr: Int): Int {
-    // Mirrors upstream's withoutProvenance, used by the empty-at-address constructor to detach
-    // an address's origin from its original allocation. In Kotlin every reference is GC-
-    // tracked and origin is implicit; the helper is the identity function on the address.
-    return addr
-}
-
-private fun splitToMustUse() {
-    // The upstream split-to and split-off must-use annotations exist solely to attach a
-    // must-use lint marker to splitTo/splitOff return values. Kotlin has no direct equivalent
-    // of that lint; this no-op preserves the symbol so callers reading upstream source can
-    // locate the corresponding port site.
-}
-
-private fun splitOffMustUse() {
-    // Companion to splitToMustUse — mirrors upstream's splitOff lint annotation.
-}
-
-private fun withVtable(bytes: ByteArray, start: Int, len: Int, data: Any?, vtable: Vtable): Bytes {
-    // Mirrors upstream Bytes withVtable, the internal constructor that wraps an opaque
-    // (data, vtable) pair into a fresh Bytes. The Kotlin Bytes class's primary constructor is
-    // private; this helper routes through the public companion factory that best matches the
-    // requested vtable.
-    return when (vtable) {
-        STATIC_VTABLE -> Bytes.fromStatic(bytes.copyOfRange(start, start + len))
-        OWNED_VTABLE -> Bytes.fromOwner(bytes.copyOfRange(start, start + len))
-        else -> Bytes.from(bytes.copyOfRange(start, start + len))
-    }
 }
 
 private fun Iterable<Byte>.toByteArray(): ByteArray {
